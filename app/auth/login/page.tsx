@@ -24,17 +24,23 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
+    console.log("[v0] Attempting login with email:", email);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
       password,
     });
 
+    console.log("[v0] Login response - data:", data, "error:", error);
+
     if (error) {
+      console.log("[v0] Login error:", error.message, error.status);
       toast.error(error.message);
       setLoading(false);
       return;
     }
 
+    console.log("[v0] Login successful, redirecting to dashboard");
     router.push("/dashboard");
     router.refresh();
   };

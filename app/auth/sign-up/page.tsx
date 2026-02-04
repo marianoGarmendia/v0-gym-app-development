@@ -40,7 +40,11 @@ export default function SignUpPage() {
     });
 
     if (error) {
-      toast.error(error.message);
+      if (error.message.includes("rate") || error.status === 429) {
+        toast.error("Demasiados intentos. Por favor espera unos minutos antes de intentar de nuevo.");
+      } else {
+        toast.error(error.message);
+      }
       setLoading(false);
       return;
     }

@@ -17,8 +17,26 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      toast.error("Ingresa tu email primero");
+      return;
+    }
+    setResetLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    });
+    setResetLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Te enviamos un email para resetear tu contrasena");
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +92,17 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Contrasena</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Contrasena</Label>
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  disabled={resetLoading}
+                  className="text-xs text-primary hover:underline disabled:opacity-50"
+                >
+                  {resetLoading ? "Enviando..." : "Olvidaste tu contrasena?"}
+                </button>
+              </div>
               <Input
                 id="password"
                 type="password"

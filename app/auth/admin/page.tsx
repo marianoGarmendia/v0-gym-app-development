@@ -32,53 +32,61 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    // Check admin credentials
+    // Check admin credentials locally first
     if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
       toast.error("Credenciales de administrador invalidas");
       setLoading(false);
       return;
     }
 
-    // Try to sign in, if fails create admin account
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    // Try to sign in
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email: ADMIN_EMAIL,
       password: ADMIN_PASSWORD,
     });
 
     if (signInError) {
-      // Admin doesn't exist, create it
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-        options: {
-          data: {
-            full_name: "Administrador",
-            role: "admin",
+      // If invalid credentials, admin might not exist - try to create it
+      if (signInError.message.includes("Invalid login credentials")) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: ADMIN_EMAIL,
+          password: ADMIN_PASSWORD,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: {
+              full_name: "Administrador",
+              role: "admin",
+            },
           },
-        },
-      });
+        });
 
-      if (signUpError) {
-        toast.error("Error al crear cuenta de administrador");
-        setLoading(false);
-        return;
-      }
+        if (signUpError) {
+          if (signUpError.message.includes("rate") || signUpError.status === 429) {
+            toast.error("Demasiados intentos. Espera unos minutos.");
+          } else {
+            toast.error(signUpError.message);
+          }
+          setLoading(false);
+          return;
+        }
 
-      // Sign in after creating
-      const { error } = await supabase.auth.signInWithPassword({
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-      });
-
-      if (error) {
-        toast.error("Por favor confirma el email de administrador primero");
+        // Check if email confirmation is required
+        if (signUpData.user && !signUpData.session) {
+          toast.success("Admin creado. Revisa tu email para confirmar la cuenta.");
+          setLoading(false);
+          return;
+        }
+      } else {
+        toast.error(signInError.message);
         setLoading(false);
         return;
       }
     }
 
-    router.push("/dashboard");
-    router.refresh();
+    if (data?.session) {
+      router.push("/dashboard");
+      router.refresh();
+    }
   };
 
   return (

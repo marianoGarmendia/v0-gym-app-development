@@ -1,9 +1,20 @@
 import React from "react"
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, Users, Calendar, MessageSquare, ChevronRight } from "lucide-react";
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
+  const params = await searchParams;
+  
+  // If there's a code in the URL, redirect to callback to handle it
+  if (params.code) {
+    redirect(`/auth/callback?code=${params.code}&type=recovery`);
+  }
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}

@@ -13,7 +13,7 @@ export default function HomePage() {
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
               <Dumbbell className="w-5 h-5 text-primary" />
             </div>
-            <span className="font-bold text-xl">GymFlow</span>
+            <span className="font-bold text-xl">G10 Flow</span>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild>
@@ -93,7 +93,7 @@ export default function HomePage() {
             Comienza tu transformacion hoy
           </h2>
           <p className="text-muted-foreground mb-8">
-            Unete a cientos de atletas y entrenadores que ya usan GymFlow
+            Unete a cientos de atletas y entrenadores que ya usan G10 Flow
           </p>
           <Button size="lg" asChild>
             <Link href="/auth/sign-up">Crear cuenta gratis</Link>
@@ -106,9 +106,9 @@ export default function HomePage() {
         <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Dumbbell className="w-4 h-4 text-primary" />
-            <span>GymFlow</span>
+            <span>G10 Flow</span>
           </div>
-          <p>2026 GymFlow. Todos los derechos reservados.</p>
+          <p>2026 G10 Flow. Todos los derechos reservados.</p>
         </div>
       </footer>
     </div>

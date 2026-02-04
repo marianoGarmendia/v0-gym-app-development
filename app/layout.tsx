@@ -7,7 +7,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "GymFlow - Gestión de Rutinas",
+  title: "G10 Flow - Gestión de Rutinas",
   description: "App de gestión de rutinas para gimnasios. Entrenadores y alumnos conectados.",
 };
 

@@ -47,7 +47,7 @@ export default function LoginPage() {
             <Dumbbell className="w-8 h-8 text-primary" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold">GymFlow</CardTitle>
+            <CardTitle className="text-2xl font-bold">G10 Flow</CardTitle>
             <CardDescription className="text-muted-foreground">
               Inicia sesion para acceder a tus rutinas
             </CardDescription>

@@ -1,10 +1,20 @@
 "use client";
 
+import React from "react";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, Calendar, TrendingUp, Trophy } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dumbbell,
+  Calendar,
+  TrendingUp,
+  Trophy,
+  User,
+  Clock,
+  FileText,
+} from "lucide-react";
 import type { Profile, RoutineAssignment, Routine } from "@/lib/types";
 import Link from "next/link";
 
@@ -18,6 +28,7 @@ interface AssignmentWithRoutine extends RoutineAssignment {
 
 export function StudentDashboard({ profile }: StudentDashboardProps) {
   const [assignments, setAssignments] = useState<AssignmentWithRoutine[]>([]);
+  const [trainers, setTrainers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -25,17 +36,33 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
     async function fetchData() {
       const { data } = await supabase
         .from("routine_assignments")
-        .select(`
+        .select(
+          `
           *,
           routine:routines(
             *,
             trainer:profiles!routines_trainer_id_fkey(*)
           )
-        `)
+        `
+        )
         .eq("student_id", profile.id);
 
       if (data) {
         setAssignments(data as AssignmentWithRoutine[]);
+        // Get unique trainers
+        const uniqueTrainers = data.reduce(
+          (acc: Profile[], curr: AssignmentWithRoutine) => {
+            if (
+              curr.routine?.trainer &&
+              !acc.find((t) => t.id === curr.routine.trainer.id)
+            ) {
+              acc.push(curr.routine.trainer);
+            }
+            return acc;
+          },
+          []
+        );
+        setTrainers(uniqueTrainers);
       }
       setLoading(false);
     }
@@ -45,26 +72,59 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
 
   const today = new Date();
   const dayOfWeek = today.toLocaleDateString("es", { weekday: "long" });
+  const formattedDate = today.toLocaleDateString("es", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const memberSince = new Date(profile.created_at).toLocaleDateString("es", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 pb-24">
       {/* Header */}
       <header className="pt-2">
-        <p className="text-muted-foreground text-sm capitalize">{dayOfWeek}</p>
-        <h1 className="text-2xl font-bold">Hola, {profile.full_name.split(" ")[0]}</h1>
+        <p className="text-muted-foreground text-sm capitalize">
+          {dayOfWeek}, {formattedDate}
+        </p>
+        <h1 className="text-2xl font-bold">
+          Hola, {profile.full_name.split(" ")[0]}
+        </h1>
       </header>
+
+      {/* Member Info */}
+      <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center">
+              <User className="w-7 h-7 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold">{profile.full_name}</h3>
+              <p className="text-sm text-muted-foreground">{profile.email}</p>
+              <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                <Clock className="w-3 h-3" />
+                <span>Miembro desde {memberSince}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="bg-primary/10 border-primary/20">
+        <Card className="bg-card border-border/50">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Dumbbell className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{assignments.length}</p>
-                <p className="text-xs text-muted-foreground">Rutinas activas</p>
+                <p className="text-xs text-muted-foreground">Planes activos</p>
               </div>
             </div>
           </CardContent>
@@ -76,27 +136,56 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
                 <Trophy className="w-5 h-5 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-2xl font-bold">0</p>
-                <p className="text-xs text-muted-foreground">Completados hoy</p>
+                <p className="text-2xl font-bold">{trainers.length}</p>
+                <p className="text-xs text-muted-foreground">Entrenadores</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Active Routines */}
+      {/* Trainers Section */}
+      {trainers.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Mis entrenadores</h2>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {trainers.map((trainer) => (
+              <Card
+                key={trainer.id}
+                className="border-border/50 min-w-[160px] shrink-0"
+              >
+                <CardContent className="p-4 text-center">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                    <User className="w-6 h-6 text-primary" />
+                  </div>
+                  <p className="font-medium text-sm truncate">
+                    {trainer.full_name}
+                  </p>
+                  <Badge variant="secondary" className="mt-2 text-xs">
+                    Entrenador
+                  </Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Active Plans */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Mis rutinas</h2>
-          <Link href="/dashboard/routines" className="text-sm text-primary">
-            Ver todas
-          </Link>
+          <h2 className="text-lg font-semibold">Mis planes de entrenamiento</h2>
+          {assignments.length > 0 && (
+            <Link href="/dashboard/routines" className="text-sm text-primary">
+              Ver todos
+            </Link>
+          )}
         </div>
 
         {loading ? (
           <div className="space-y-3">
-            <Skeleton className="h-24 w-full rounded-2xl" />
-            <Skeleton className="h-24 w-full rounded-2xl" />
+            <Skeleton className="h-28 w-full rounded-2xl" />
+            <Skeleton className="h-28 w-full rounded-2xl" />
           </div>
         ) : assignments.length === 0 ? (
           <Card className="border-dashed border-2 border-border/50">
@@ -104,9 +193,10 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
                 <Calendar className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-medium mb-2">Sin rutinas asignadas</h3>
+              <h3 className="font-medium mb-2">Sin planes asignados</h3>
               <p className="text-sm text-muted-foreground">
-                Tu entrenador aun no te ha asignado ninguna rutina
+                Tu entrenador aun no te ha asignado ninguna rutina. Contactalo
+                para comenzar tu entrenamiento.
               </p>
             </CardContent>
           </Card>
@@ -119,24 +209,41 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
               >
                 <Card className="border-border/50 hover:border-primary/50 transition-colors">
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                         <Dumbbell className="w-6 h-6 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold truncate">{assignment.routine.name}</h3>
+                        <h3 className="font-semibold truncate">
+                          {assignment.routine.name}
+                        </h3>
                         <p className="text-sm text-muted-foreground">
-                          {assignment.routine.trainer.full_name}
+                          Por {assignment.routine.trainer.full_name}
                         </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">
-                          {assignment.routine.duration_type === "week"
-                            ? "Semanal"
-                            : assignment.routine.duration_type === "month"
-                            ? "Mensual"
-                            : "Trimestral"}
-                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline" className="text-xs">
+                            {assignment.routine.duration_type === "week"
+                              ? "Semanal"
+                              : assignment.routine.duration_type === "month"
+                                ? "Mensual"
+                                : "Trimestral"}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(
+                              assignment.routine.start_date
+                            ).toLocaleDateString("es", {
+                              day: "numeric",
+                              month: "short",
+                            })}{" "}
+                            -{" "}
+                            {new Date(
+                              assignment.routine.end_date
+                            ).toLocaleDateString("es", {
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -147,6 +254,24 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
         )}
       </section>
 
+      {/* Progress Section */}
+      <section>
+        <h2 className="text-lg font-semibold mb-4">Progresos e informes</h2>
+        <Card className="border-border/50">
+          <CardContent className="p-6 text-center">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+              <FileText className="w-7 h-7 text-muted-foreground" />
+            </div>
+            <h3 className="font-medium mb-2">Informes de progreso</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Aqui podras ver los informes generados por IA sobre tu evolucion y
+              rendimiento.
+            </p>
+            <Badge variant="secondary">Proximamente</Badge>
+          </CardContent>
+        </Card>
+      </section>
+
       {/* Quick Actions */}
       <section>
         <h2 className="text-lg font-semibold mb-4">Acciones rapidas</h2>
@@ -155,14 +280,15 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
             <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer">
               <CardContent className="p-4 text-center">
                 <Calendar className="w-6 h-6 mx-auto mb-2 text-primary" />
-                <p className="text-sm font-medium">Ver rutinas</p>
+                <p className="text-sm font-medium">Ver planes</p>
               </CardContent>
             </Card>
           </Link>
-          <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer">
+          <Card className="border-border/50 opacity-60">
             <CardContent className="p-4 text-center">
-              <TrendingUp className="w-6 h-6 mx-auto mb-2 text-primary" />
+              <TrendingUp className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
               <p className="text-sm font-medium">Mi progreso</p>
+              <p className="text-xs text-muted-foreground">Pronto</p>
             </CardContent>
           </Card>
         </div>

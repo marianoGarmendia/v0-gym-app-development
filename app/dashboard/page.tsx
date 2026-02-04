@@ -1,12 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { StudentDashboard } from "@/components/dashboard/student-dashboard";
+import { StudentDashboardWrapper } from "@/components/dashboard/student-dashboard-wrapper";
 import { TrainerDashboard } from "@/components/dashboard/trainer-dashboard";
 import { AdminDashboard } from "@/components/dashboard/admin-dashboard";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/auth/login");
@@ -30,5 +32,6 @@ export default async function DashboardPage() {
     return <TrainerDashboard profile={profile} />;
   }
 
-  return <StudentDashboard profile={profile} />;
+  // Students get the wrapper that handles onboarding
+  return <StudentDashboardWrapper profile={profile} />;
 }

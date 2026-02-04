@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react"
-
+import React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -9,7 +8,13 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Loader2, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,9 +32,12 @@ export default function LoginPage() {
       return;
     }
     setResetLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
-    });
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      }
+    );
     setResetLoading(false);
     if (error) {
       toast.error(error.message);
@@ -42,23 +50,17 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    console.log("[v0] Attempting login with email:", email);
-
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     });
 
-    console.log("[v0] Login response - data:", data, "error:", error);
-
     if (error) {
-      console.log("[v0] Login error:", error.message, error.status);
       toast.error(error.message);
       setLoading(false);
       return;
     }
 
-    console.log("[v0] Login successful, redirecting to dashboard");
     router.push("/dashboard");
     router.refresh();
   };
@@ -126,7 +128,10 @@ export default function LoginPage() {
           </form>
           <div className="mt-6 text-center text-sm text-muted-foreground">
             No tienes cuenta?{" "}
-            <Link href="/auth/sign-up" className="text-primary hover:underline font-medium">
+            <Link
+              href="/auth/sign-up"
+              className="text-primary hover:underline font-medium"
+            >
               Registrate
             </Link>
           </div>

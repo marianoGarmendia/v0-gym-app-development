@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react"
-
+import React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -9,8 +8,13 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Loader2, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,7 +22,6 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<"student" | "trainer">("student");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -34,14 +37,16 @@ export default function SignUpPage() {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: {
           full_name: fullName,
-          role: role,
+          role: "student",
         },
       },
     });
 
     if (error) {
       if (error.message.includes("rate") || error.status === 429) {
-        toast.error("Demasiados intentos. Por favor espera unos minutos antes de intentar de nuevo.");
+        toast.error(
+          "Demasiados intentos. Por favor espera unos minutos antes de intentar de nuevo."
+        );
       } else {
         toast.error(error.message);
       }
@@ -105,18 +110,6 @@ export default function SignUpPage() {
                 className="bg-background/50"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Tipo de cuenta</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as "student" | "trainer")}>
-                <SelectTrigger className="bg-background/50">
-                  <SelectValue placeholder="Selecciona tu rol" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="student">Alumno</SelectItem>
-                  <SelectItem value="trainer">Entrenador</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
                 <>
@@ -130,7 +123,10 @@ export default function SignUpPage() {
           </form>
           <div className="mt-6 text-center text-sm text-muted-foreground">
             Ya tienes cuenta?{" "}
-            <Link href="/auth/login" className="text-primary hover:underline font-medium">
+            <Link
+              href="/auth/login"
+              className="text-primary hover:underline font-medium"
+            >
               Inicia sesion
             </Link>
           </div>

@@ -6,6 +6,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
-
-export default nextConfig
+};
+// Comentario de prueba
+export default nextConfig;

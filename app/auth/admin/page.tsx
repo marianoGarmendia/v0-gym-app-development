@@ -17,14 +17,15 @@ import {
 import { Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
 
-// Admin credentials - in production, use environment variables
-const ADMIN_EMAIL = "admin@g10flow.com";
-const ADMIN_PASSWORD = "G10Admin2024!";
+// Secret key to create admin - change this in production
+const ADMIN_SECRET_KEY = "G10ADMIN2024";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [secretKey, setSecretKey] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"login" | "create">("login");
   const router = useRouter();
   const supabase = createClient();
 
@@ -32,120 +33,203 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    // Check admin credentials locally first
-    if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
-      toast.error("Credenciales de administrador invalidas");
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+
+    if (error) {
+      toast.error(error.message);
       setLoading(false);
       return;
     }
 
-    // Try to sign in
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-    });
+    // Check if user is admin
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .single();
 
-    if (signInError) {
-      // If invalid credentials, admin might not exist - try to create it
-      if (signInError.message.includes("Invalid login credentials")) {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: ADMIN_EMAIL,
-          password: ADMIN_PASSWORD,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-            data: {
-              full_name: "Administrador",
-              role: "admin",
-            },
-          },
-        });
-
-        if (signUpError) {
-          if (signUpError.message.includes("rate") || signUpError.status === 429) {
-            toast.error("Demasiados intentos. Espera unos minutos.");
-          } else {
-            toast.error(signUpError.message);
-          }
-          setLoading(false);
-          return;
-        }
-
-        // Check if email confirmation is required
-        if (signUpData.user && !signUpData.session) {
-          toast.success("Admin creado. Revisa tu email para confirmar la cuenta.");
-          setLoading(false);
-          return;
-        }
-      } else {
-        toast.error(signInError.message);
-        setLoading(false);
-        return;
-      }
+    if (profile?.role !== "admin") {
+      await supabase.auth.signOut();
+      toast.error("Este usuario no tiene permisos de administrador");
+      setLoading(false);
+      return;
     }
 
-    if (data?.session) {
+    router.push("/dashboard");
+    router.refresh();
+  };
+
+  const handleCreateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    // Verify secret key
+    if (secretKey !== ADMIN_SECRET_KEY) {
+      toast.error("Clave secreta incorrecta");
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          full_name: "Administrador",
+          role: "admin",
+        },
+      },
+    });
+
+    if (error) {
+      if (error.message.includes("rate") || error.status === 429) {
+        toast.error("Demasiados intentos. Espera unos minutos.");
+      } else {
+        toast.error(error.message);
+      }
+      setLoading(false);
+      return;
+    }
+
+    if (data.user && !data.session) {
+      toast.success("Admin creado. Revisa tu email para confirmar la cuenta.");
+    } else if (data.session) {
       router.push("/dashboard");
       router.refresh();
     }
+    
+    setLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-md border-border/50 bg-card/50 backdrop-blur">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center">
-            <Shield className="w-8 h-8 text-destructive" />
+          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center">
+            <Shield className="w-8 h-8 text-primary" />
           </div>
           <div>
             <CardTitle className="text-2xl font-bold">
-              Acceso Administrador
+              {mode === "login" ? "Acceso Administrador" : "Crear Admin"}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
               Panel de control de G10 Flow
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleAdminLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email de administrador</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@g10flow.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="bg-background/50"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Contrasena</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-background/50"
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full bg-destructive hover:bg-destructive/90"
-              disabled={loading}
+        <CardContent className="space-y-4">
+          {mode === "login" ? (
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="tu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-background/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Contrasena</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="********"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-background/50"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verificando...
+                  </>
+                ) : (
+                  "Ingresar como Admin"
+                )}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleCreateAdmin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Tu email real</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="tu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-background/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Contrasena</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Minimo 6 caracteres"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="bg-background/50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="secretKey">Clave secreta de admin</Label>
+                <Input
+                  id="secretKey"
+                  type="password"
+                  placeholder="Clave secreta"
+                  value={secretKey}
+                  onChange={(e) => setSecretKey(e.target.value)}
+                  required
+                  className="bg-background/50"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  "Crear cuenta Admin"
+                )}
+              </Button>
+            </form>
+          )}
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setMode(mode === "login" ? "create" : "login")}
+              className="text-sm text-primary hover:underline"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verificando...
-                </>
-              ) : (
-                "Acceder como Admin"
-              )}
-            </Button>
-          </form>
+              {mode === "login" 
+                ? "No tienes cuenta? Crear admin" 
+                : "Ya tienes cuenta? Ingresar"}
+            </button>
+          </div>
         </CardContent>
       </Card>
     </div>

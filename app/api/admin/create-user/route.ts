@@ -1,8 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 // Admin API route to create users without email confirmation
 // Uses SUPABASE_SERVICE_ROLE_KEY for admin privileges
+// Auth: either adminSecret (scripts/external) or logged-in admin session (dashboard)
 
 const ADMIN_SECRET_KEY = "G10ADMIN2024";
 
@@ -11,10 +13,25 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { email, password, full_name, role, adminSecret } = body;
 
-    // Verify admin secret
-    if (adminSecret !== ADMIN_SECRET_KEY) {
+    // Auth: adminSecret OR session with profile.role === 'admin'
+    const hasValidSecret = adminSecret === ADMIN_SECRET_KEY;
+    let isAdminSession = false;
+    if (!hasValidSecret) {
+      const supabase = await createServerClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        isAdminSession = profile?.role === "admin";
+      }
+    }
+
+    if (!hasValidSecret && !isAdminSession) {
       return NextResponse.json(
-        { error: "Clave de administrador invalida" },
+        { error: "No autorizado. Usa la clave de administrador o inicia sesión como admin." },
         { status: 401 }
       );
     }

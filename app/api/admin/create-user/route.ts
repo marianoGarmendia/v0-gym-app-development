@@ -6,7 +6,7 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 // Uses SUPABASE_SERVICE_ROLE_KEY for admin privileges
 // Auth: either adminSecret (scripts/external) or logged-in admin session (dashboard)
 
-const ADMIN_SECRET_KEY = "G10ADMIN2024";
+const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY;
 
 export async function POST(request: Request) {
   try {
@@ -18,7 +18,9 @@ export async function POST(request: Request) {
     let isAdminSession = false;
     if (!hasValidSecret) {
       const supabase = await createServerClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
@@ -31,8 +33,11 @@ export async function POST(request: Request) {
 
     if (!hasValidSecret && !isAdminSession) {
       return NextResponse.json(
-        { error: "No autorizado. Usa la clave de administrador o inicia sesión como admin." },
-        { status: 401 }
+        {
+          error:
+            "No autorizado. Usa la clave de administrador o inicia sesión como admin.",
+        },
+        { status: 401 },
       );
     }
 
@@ -40,16 +45,13 @@ export async function POST(request: Request) {
     if (!email || !password || !full_name || !role) {
       return NextResponse.json(
         { error: "Faltan campos requeridos" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Validate role
     if (!["admin", "trainer", "student"].includes(role)) {
-      return NextResponse.json(
-        { error: "Rol invalido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Rol invalido" }, { status: 400 });
     }
 
     // Create Supabase admin client with service role key
@@ -61,25 +63,23 @@ export async function POST(request: Request) {
           autoRefreshToken: false,
           persistSession: false,
         },
-      }
+      },
     );
 
     // Create user with admin API (no email confirmation needed)
-    const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Skip email verification
-      user_metadata: {
-        full_name,
-        role,
-      },
-    });
+    const { data: userData, error: createError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Skip email verification
+        user_metadata: {
+          full_name,
+          role,
+        },
+      });
 
     if (createError) {
-      return NextResponse.json(
-        { error: createError.message },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: createError.message }, { status: 400 });
     }
 
     // Create profile in public.profiles table
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       await supabaseAdmin.auth.admin.deleteUser(userData.user.id);
       return NextResponse.json(
         { error: "Error al crear perfil: " + profileError.message },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
     console.error("Error creating user:", error);
     return NextResponse.json(
       { error: "Error interno del servidor" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -7,6 +7,7 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 // Auth: either adminSecret (scripts/external) or logged-in admin session (dashboard)
 
 const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY;
+console.log(ADMIN_SECRET_KEY);
 
 export async function POST(request: Request) {
   try {
@@ -80,26 +81,6 @@ export async function POST(request: Request) {
 
     if (createError) {
       return NextResponse.json({ error: createError.message }, { status: 400 });
-    }
-
-    // Create profile in public.profiles table
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .insert({
-        id: userData.user.id,
-        email: userData.user.email,
-        full_name,
-        role,
-        onboarding_completed: role !== "student", // Only students need onboarding
-      });
-
-    if (profileError) {
-      // If profile creation fails, delete the auth user
-      await supabaseAdmin.auth.admin.deleteUser(userData.user.id);
-      return NextResponse.json(
-        { error: "Error al crear perfil: " + profileError.message },
-        { status: 400 },
-      );
     }
 
     return NextResponse.json({

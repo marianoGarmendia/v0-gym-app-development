@@ -79,8 +79,12 @@ export function AdminDashboard({ profile }: AdminDashboardProps) {
     fetchData();
   }, [supabase]);
 
-  const today = new Date();
-  const dayOfWeek = today.toLocaleDateString("es", { weekday: "long" });
+  const [dayOfWeek, setDayOfWeek] = useState("");
+
+  useEffect(() => {
+    const today = new Date();
+    setDayOfWeek(today.toLocaleDateString("es", { weekday: "long" }));
+  }, []);
 
   return (
     <div className="p-4 space-y-6 pb-24">

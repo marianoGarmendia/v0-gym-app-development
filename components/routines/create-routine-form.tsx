@@ -282,13 +282,9 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
                 weight: c.weight || null,
               }));
             const configs = setConfigs.length > 0 ? setConfigs : [{ sets: null, reps: null, weight: null }];
-            const first = configs[0];
             return {
               workout_day_id: workoutDay.id,
               name: e.name,
-              sets: first.sets ?? 3,
-              reps: first.reps ?? "10",
-              weight: first.weight ?? null,
               set_configurations: configs,
               video_url: e.video_url || null,
               notes: e.notes || null,

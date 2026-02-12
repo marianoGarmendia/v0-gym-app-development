@@ -52,9 +52,6 @@ export interface Exercise {
   id: string;
   workout_day_id: string;
   name: string;
-  sets: number | null;
-  reps: string | null;
-  weight: string | null;
   set_configurations?: SetConfiguration[];
   video_url: string | null;
   notes: string | null;

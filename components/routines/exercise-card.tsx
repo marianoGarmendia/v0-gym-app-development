@@ -4,7 +4,6 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Check, Play, MessageSquare, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
@@ -153,25 +152,7 @@ export function ExerciseCard({
                           .join(" ")}
                       </span>
                     ))
-                ) : (
-                  <>
-                    {exercise.sets != null && (
-                      <span className="text-xs bg-muted px-2 py-1 rounded-lg">
-                        {exercise.sets} series
-                      </span>
-                    )}
-                    {exercise.reps && (
-                      <span className="text-xs bg-muted px-2 py-1 rounded-lg">
-                        {exercise.reps} reps
-                      </span>
-                    )}
-                    {exercise.weight && (
-                      <span className="text-xs bg-muted px-2 py-1 rounded-lg">
-                        {exercise.weight}
-                      </span>
-                    )}
-                  </>
-                )}
+                ) : null}
               </div>
             </div>
 

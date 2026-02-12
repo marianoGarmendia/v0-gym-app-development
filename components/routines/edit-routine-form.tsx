@@ -291,22 +291,15 @@ export function EditRoutineForm({
         exercises: (wd.exercises || [])
           .sort((a, b) => a.order_index - b.order_index)
           .map((e) => {
-            const ex = e as Exercise & { set_configurations?: { sets: number | null; reps: string | null; weight: string | null }[] };
-            const configs = ex.set_configurations?.length
-              ? ex.set_configurations.map((c, i) => ({
+            const configs = (e.set_configurations ?? []).map((c, i) => ({
                   id: `${e.id}-config-${i}`,
                   sets: c.sets?.toString() ?? "",
                   reps: c.reps ?? "",
                   weight: c.weight ?? "",
-                }))
-              : [
-                  {
-                    id: `${e.id}-config-0`,
-                    sets: e.sets?.toString() ?? "",
-                    reps: e.reps ?? "",
-                    weight: e.weight ?? "",
-                  },
-                ];
+                }));
+            if (configs.length === 0) {
+              configs.push({ id: `${e.id}-config-0`, sets: "", reps: "", weight: "" });
+            }
             return {
               id: e.id,
               name: e.name,
@@ -419,12 +412,8 @@ export function EditRoutineForm({
           }
 
           for (const ex of exercisesToSync) {
-            const first = ex.set_configurations[0];
             const payload = {
               name: ex.name,
-              sets: first?.sets ?? 3,
-              reps: first?.reps ?? "10",
-              weight: first?.weight ?? null,
               set_configurations: ex.set_configurations,
               video_url: ex.video_url,
               notes: ex.notes,
@@ -460,20 +449,14 @@ export function EditRoutineForm({
           if (dayError) throw dayError;
 
           if (workoutDay && exercisesToSync.length > 0) {
-            const exercisesToInsert = exercisesToSync.map((e, index) => {
-              const first = e.set_configurations[0];
-              return {
+            const exercisesToInsert = exercisesToSync.map((e, index) => ({
                 workout_day_id: workoutDay.id,
                 name: e.name,
-                sets: first?.sets ?? 3,
-                reps: first?.reps ?? "10",
-                weight: first?.weight ?? null,
                 set_configurations: e.set_configurations,
                 video_url: e.video_url,
                 notes: e.notes,
                 order_index: index,
-              };
-            });
+            }));
 
             const { error: exError } = await supabase
               .from("exercises")

@@ -13,6 +13,7 @@ import {
   Check,
   MessageSquare,
   ExternalLink,
+  Pencil,
 } from "lucide-react";
 import type { Profile, Routine, WorkoutDay, Exercise, ExerciseCompletion } from "@/lib/types";
 import Link from "next/link";
@@ -132,12 +133,20 @@ export function RoutineViewer({ routine, profile }: RoutineViewerProps) {
               <ChevronLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="font-bold text-lg truncate">{routine.name}</h1>
             <p className="text-sm text-muted-foreground truncate">
               {routine.trainer.full_name}
             </p>
           </div>
+          {((profile.role === "trainer" && routine.trainer_id === profile.id) ||
+            profile.role === "admin") && (
+              <Link href={`/dashboard/routines/${routine.id}/edit`}>
+                <Button variant="outline" size="icon" className="shrink-0">
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              </Link>
+            )}
         </div>
 
         {/* Week navigation */}

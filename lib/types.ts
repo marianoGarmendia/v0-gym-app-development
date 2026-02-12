@@ -42,6 +42,12 @@ export interface WorkoutDay {
   exercises?: Exercise[];
 }
 
+export interface SetConfiguration {
+  sets: number | null;
+  reps: string | null;
+  weight: string | null;
+}
+
 export interface Exercise {
   id: string;
   workout_day_id: string;
@@ -49,6 +55,7 @@ export interface Exercise {
   sets: number | null;
   reps: string | null;
   weight: string | null;
+  set_configurations?: SetConfiguration[];
   video_url: string | null;
   notes: string | null;
   order_index: number;

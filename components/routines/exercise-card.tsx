@@ -131,20 +131,46 @@ export function ExerciseCard({
                 {exercise.name}
               </h3>
               <div className="flex flex-wrap gap-2 mt-2">
-                {exercise.sets && (
-                  <span className="text-xs bg-muted px-2 py-1 rounded-lg">
-                    {exercise.sets} series
-                  </span>
-                )}
-                {exercise.reps && (
-                  <span className="text-xs bg-muted px-2 py-1 rounded-lg">
-                    {exercise.reps} reps
-                  </span>
-                )}
-                {exercise.weight && (
-                  <span className="text-xs bg-muted px-2 py-1 rounded-lg">
-                    {exercise.weight}
-                  </span>
+                {exercise.set_configurations?.length ? (
+                  exercise.set_configurations
+                    .filter(
+                      (c) =>
+                        c.sets != null ||
+                        c.reps ||
+                        c.weight
+                    )
+                    .map((c, i) => (
+                      <span
+                        key={i}
+                        className="text-xs bg-muted px-2 py-1 rounded-lg"
+                      >
+                        {[
+                          c.sets != null && `${c.sets} series`,
+                          c.reps && `de ${c.reps} reps`,
+                          c.weight && `con ${c.weight}`,
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      </span>
+                    ))
+                ) : (
+                  <>
+                    {exercise.sets != null && (
+                      <span className="text-xs bg-muted px-2 py-1 rounded-lg">
+                        {exercise.sets} series
+                      </span>
+                    )}
+                    {exercise.reps && (
+                      <span className="text-xs bg-muted px-2 py-1 rounded-lg">
+                        {exercise.reps} reps
+                      </span>
+                    )}
+                    {exercise.weight && (
+                      <span className="text-xs bg-muted px-2 py-1 rounded-lg">
+                        {exercise.weight}
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>

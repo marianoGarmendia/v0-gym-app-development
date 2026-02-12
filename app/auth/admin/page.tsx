@@ -17,7 +17,6 @@ import {
 import { Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
 
-// Secret key to create admin - change this in production
 const ADMIN_SECRET_KEY = "G10ADMIN2024";
 
 export default function AdminLoginPage() {
@@ -66,40 +65,42 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    // Verify secret key
+    // Verify secret key locally first
     if (secretKey !== ADMIN_SECRET_KEY) {
       toast.error("Clave secreta incorrecta");
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        data: {
+    try {
+      // Use admin API to create user without email confirmation
+      const response = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
           full_name: "Administrador",
           role: "admin",
-        },
-      },
-    });
+          adminSecret: secretKey,
+        }),
+      });
 
-    if (error) {
-      if (error.message.includes("rate") || error.status === 429) {
-        toast.error("Demasiados intentos. Espera unos minutos.");
-      } else {
-        toast.error(error.message);
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || "Error al crear admin");
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-      return;
-    }
 
-    if (data.user && !data.session) {
-      toast.success("Admin creado. Revisa tu email para confirmar la cuenta.");
-    } else if (data.session) {
-      router.push("/dashboard");
-      router.refresh();
+      toast.success("Admin creado exitosamente. Ahora puedes iniciar sesion.");
+      setMode("login");
+      setSecretKey("");
+    } catch (error) {
+      toast.error("Error de conexion");
     }
     
     setLoading(false);
@@ -166,7 +167,7 @@ export default function AdminLoginPage() {
           ) : (
             <form onSubmit={handleCreateAdmin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Tu email real</Label>
+                <Label htmlFor="email">Tu email</Label>
                 <Input
                   id="email"
                   type="email"

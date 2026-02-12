@@ -70,13 +70,18 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
     fetchData();
   }, [profile.id, supabase]);
 
-  const today = new Date();
-  const dayOfWeek = today.toLocaleDateString("es", { weekday: "long" });
-  const formattedDate = today.toLocaleDateString("es", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const [dayOfWeek, setDayOfWeek] = useState("");
+  const [formattedDate, setFormattedDate] = useState("");
+
+  useEffect(() => {
+    const today = new Date();
+    setDayOfWeek(today.toLocaleDateString("es", { weekday: "long" }));
+    setFormattedDate(today.toLocaleDateString("es", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }));
+  }, []);
   const memberSince = new Date(profile.created_at).toLocaleDateString("es", {
     day: "numeric",
     month: "long",

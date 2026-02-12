@@ -52,8 +52,12 @@ export function TrainerDashboard({ profile }: TrainerDashboardProps) {
     fetchData();
   }, [profile.id, supabase]);
 
-  const today = new Date();
-  const dayOfWeek = today.toLocaleDateString("es", { weekday: "long" });
+  const [dayOfWeek, setDayOfWeek] = useState("");
+
+  useEffect(() => {
+    const today = new Date();
+    setDayOfWeek(today.toLocaleDateString("es", { weekday: "long" }));
+  }, []);
 
   return (
     <div className="p-4 space-y-6">

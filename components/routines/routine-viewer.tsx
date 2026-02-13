@@ -14,12 +14,26 @@ import {
   MessageSquare,
   ExternalLink,
   Pencil,
+  UserPlus,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { Profile, Routine, WorkoutDay, Exercise, ExerciseCompletion } from "@/lib/types";
 import Link from "next/link";
 import { ExerciseCard } from "./exercise-card";
 import { WeekCommentModal } from "./week-comment-modal";
 import { DayCommentModal } from "./day-comment-modal";
+import { toast } from "sonner";
+
+interface TrainerStudent {
+  student_id: string;
+  student: { id: string; full_name: string; email: string };
+}
 
 interface RoutineViewerProps {
   routine: Routine & {
@@ -27,16 +41,79 @@ interface RoutineViewerProps {
     workout_days: (WorkoutDay & { exercises: Exercise[] })[];
   };
   profile: Profile;
+  trainerStudents?: TrainerStudent[];
+  assignedStudentIds?: string[];
 }
 
-export function RoutineViewer({ routine, profile }: RoutineViewerProps) {
+export function RoutineViewer({ routine, profile, trainerStudents = [], assignedStudentIds = [] }: RoutineViewerProps) {
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [selectedDay, setSelectedDay] = useState(1);
   const [completions, setCompletions] = useState<Record<string, ExerciseCompletion>>({});
   const [loading, setLoading] = useState(true);
   const [weekCommentOpen, setWeekCommentOpen] = useState(false);
   const [dayCommentOpen, setDayCommentOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+
+  // Comments state
+  interface CommentData {
+    id: string;
+    content: string;
+    created_at: string;
+    comment_type: string;
+    routine_id?: string;
+    week_number?: number;
+    workout_day_id?: string;
+    exercise_id?: string;
+  }
+  const [weekComments, setWeekComments] = useState<CommentData[]>([]);
+  const [dayComments, setDayComments] = useState<Record<string, CommentData[]>>({});
+  const [exerciseComments, setExerciseComments] = useState<Record<string, CommentData[]>>({});
+  const [selectedStudents, setSelectedStudents] = useState<string[]>(assignedStudentIds);
+  const [savingAssignments, setSavingAssignments] = useState(false);
   const supabase = createClient();
+
+  const toggleStudent = (studentId: string) => {
+    setSelectedStudents((prev) =>
+      prev.includes(studentId)
+        ? prev.filter((id) => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  const handleSaveAssignments = async () => {
+    setSavingAssignments(true);
+    try {
+      const currentSet = new Set(assignedStudentIds);
+      const newSet = new Set(selectedStudents);
+
+      // Add new assignments
+      for (const studentId of newSet) {
+        if (!currentSet.has(studentId)) {
+          await supabase.from("routine_assignments").insert({
+            routine_id: routine.id,
+            student_id: studentId,
+          });
+        }
+      }
+
+      // Remove unselected assignments
+      for (const studentId of currentSet) {
+        if (!newSet.has(studentId)) {
+          await supabase
+            .from("routine_assignments")
+            .delete()
+            .eq("routine_id", routine.id)
+            .eq("student_id", studentId);
+        }
+      }
+
+      toast.success("Alumnos actualizados");
+      setAssignModalOpen(false);
+    } catch {
+      toast.error("Error al actualizar alumnos");
+    }
+    setSavingAssignments(false);
+  };
 
   // Calculate total weeks based on duration
   const getTotalWeeks = () => {
@@ -141,11 +218,23 @@ export function RoutineViewer({ routine, profile }: RoutineViewerProps) {
           </div>
           {((profile.role === "trainer" && routine.trainer_id === profile.id) ||
             profile.role === "admin") && (
-              <Link href={`/dashboard/routines/${routine.id}/edit`}>
-                <Button variant="outline" size="icon" className="shrink-0">
-                  <Pencil className="w-4 h-4" />
-                </Button>
-              </Link>
+              <div className="flex gap-2">
+                {trainerStudents.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => setAssignModalOpen(true)}
+                  >
+                    <UserPlus className="w-4 h-4" />
+                  </Button>
+                )}
+                <Link href={`/dashboard/routines/${routine.id}/edit`}>
+                  <Button variant="outline" size="icon" className="shrink-0">
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
             )}
         </div>
 
@@ -311,6 +400,39 @@ export function RoutineViewer({ routine, profile }: RoutineViewerProps) {
           </>
         )}
       </div>
+
+      {/* Assign students modal */}
+      <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Asignar alumnos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 max-h-60 overflow-y-auto">
+            {trainerStudents.map((ts) => (
+              <div key={ts.student_id} className="flex items-center gap-3">
+                <Checkbox
+                  id={`assign-${ts.student_id}`}
+                  checked={selectedStudents.includes(ts.student_id)}
+                  onCheckedChange={() => toggleStudent(ts.student_id)}
+                />
+                <label
+                  htmlFor={`assign-${ts.student_id}`}
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  {ts.student.full_name}
+                </label>
+              </div>
+            ))}
+          </div>
+          <Button
+            onClick={handleSaveAssignments}
+            disabled={savingAssignments}
+            className="w-full"
+          >
+            {savingAssignments ? "Guardando..." : "Guardar"}
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       {/* Modals */}
       <WeekCommentModal

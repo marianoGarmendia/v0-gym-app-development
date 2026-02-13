@@ -29,6 +29,7 @@ export interface RoutineAssignment {
   routine_id: string;
   student_id: string;
   assigned_at: string;
+  visible?: boolean;
   routine?: Routine;
 }
 

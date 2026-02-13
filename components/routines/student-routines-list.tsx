@@ -32,7 +32,8 @@ export function StudentRoutinesList({ profile }: StudentRoutinesListProps) {
             trainer:profiles!routines_trainer_id_fkey(*)
           )
         `)
-        .eq("student_id", profile.id);
+        .eq("student_id", profile.id)
+        .eq("visible", true);
 
       if (data) {
         setAssignments(data as AssignmentWithRoutine[]);

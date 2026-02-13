@@ -28,6 +28,20 @@ export default async function NewRoutinePage() {
       student:profiles!trainer_students_student_id_fkey(*)
     `)
     .eq("trainer_id", profile.id);
+  /*
+  "De la tabla profiles, traeme el registro cuyo id coincida con el student_id de
+ trainer_students, y guardalo en una propiedad que yo llamo student"           
+                                                                               
+Es el equivalente a este SQL:                                                  
+
+SELECT
+  trainer_students.*,
+  profiles.* AS student
+FROM trainer_students
+JOIN profiles ON profiles.id = trainer_students.student_id
+WHERE trainer_students.trainer_id = 'id-del-trainer';
+  
+  */
 
   return <CreateRoutineForm trainerId={profile.id} students={students || []} />;
 }

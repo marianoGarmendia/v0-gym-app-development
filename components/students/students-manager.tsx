@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Users, Plus, Search, UserPlus, Mail, Loader2 } from "lucide-react";
 import type { Profile, TrainerStudent } from "@/lib/types";
+import Link from "next/link";
 import { toast } from "sonner";
 
 interface StudentsManagerProps {
@@ -204,22 +205,24 @@ export function StudentsManager({ trainerId }: StudentsManagerProps) {
       ) : (
         <div className="space-y-3">
           {students.map((s) => (
-            <Card key={s.id} className="border-border/50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-                    {s.student.full_name.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate">{s.student.full_name}</h3>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Mail className="w-3 h-3" />
-                      <span className="truncate">{s.student.email}</span>
+            <Link key={s.id} href={`/dashboard/students/${s.student_id}`}>
+              <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
+                      {s.student.full_name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold truncate">{s.student.full_name}</h3>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Mail className="w-3 h-3" />
+                        <span className="truncate">{s.student.email}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

@@ -43,6 +43,27 @@ export default async function RoutinePage({ params }: RoutinePageProps) {
     notFound();
   }
 
+  // Fetch trainer's students and current assignments (for trainers/admins)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let trainerStudents: any[] = [];
+  let assignedStudentIds: string[] = [];
+
+  if (profile.role === "trainer" || profile.role === "admin") {
+    const { data: ts } = await supabase
+      .from("trainer_students")
+      .select("student_id, student:profiles!trainer_students_student_id_fkey(id, full_name, email)")
+      .eq("trainer_id", profile.id);
+
+    trainerStudents = ts || [];
+
+    const { data: assignments } = await supabase
+      .from("routine_assignments")
+      .select("student_id")
+      .eq("routine_id", id);
+
+    assignedStudentIds = (assignments || []).map((a) => a.student_id);
+  }
+
   // Check if user has access to this routine
   if (profile.role === "student") {
     const { data: assignment } = await supabase
@@ -59,5 +80,12 @@ export default async function RoutinePage({ params }: RoutinePageProps) {
     notFound();
   }
 
-  return <RoutineViewer routine={routine} profile={profile} />;
+  return (
+    <RoutineViewer
+      routine={routine}
+      profile={profile}
+      trainerStudents={trainerStudents}
+      assignedStudentIds={assignedStudentIds}
+    />
+  );
 }

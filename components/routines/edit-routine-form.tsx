@@ -1,8 +1,7 @@
 "use client";
 
-import React from "react"
-
-import { useState } from "react";
+import React from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,13 +20,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronLeft, Plus, Trash2, Loader2, GripVertical, Minus } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import type { Profile, TrainerStudent } from "@/lib/types";
+import type { Profile, TrainerStudent, Routine, WorkoutDay, Exercise } from "@/lib/types";
 
 interface StudentWithProfile extends TrainerStudent {
   student: Profile;
 }
 
-interface CreateRoutineFormProps {
+interface EditRoutineFormProps {
+  routineId: string;
   trainerId: string;
   students: StudentWithProfile[];
 }
@@ -49,24 +49,33 @@ interface ExerciseInput {
 
 interface DayInput {
   id: string;
+  workoutDayId?: string; // DB id for existing workout days
   day_number: number;
   week_number: number;
   name: string;
   exercises: ExerciseInput[];
 }
 
-export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProps) {
+function isUuid(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+export function EditRoutineForm({
+  routineId,
+  trainerId,
+  students,
+}: EditRoutineFormProps) {
   const router = useRouter();
   const supabase = createClient();
-  const [loading, setLoading] = useState(false);
-
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [durationType, setDurationType] = useState<"week" | "month" | "trimester">("week");
   const [startDate, setStartDate] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [days, setDays] = useState<DayInput[]>([]);
-
   const [currentWeek, setCurrentWeek] = useState(1);
   const [currentDay, setCurrentDay] = useState(1);
 
@@ -130,7 +139,11 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
     }
   };
 
-  const updateExercise = (exerciseId: string, field: keyof ExerciseInput, value: string) => {
+  const updateExercise = (
+    exerciseId: string,
+    field: keyof ExerciseInput,
+    value: string
+  ) => {
     setDays(
       days.map((d) => ({
         ...d,
@@ -227,6 +240,83 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
     );
   };
 
+  // Load routine data
+  useEffect(() => {
+    async function loadRoutine() {
+      const { data: routine, error: routineError } = await supabase
+        .from("routines")
+        .select(`
+          *,
+          workout_days(
+            *,
+            exercises(*)
+          )
+        `)
+        .eq("id", routineId)
+        .eq("trainer_id", trainerId)
+        .single();
+
+      if (routineError || !routine) {
+        toast.error("No se pudo cargar la rutina");
+        router.push("/dashboard/routines");
+        return;
+      }
+
+      // Load assigned students
+      const { data: assignments } = await supabase
+        .from("routine_assignments")
+        .select("student_id")
+        .eq("routine_id", routineId);
+
+      setName(routine.name);
+      setDescription(routine.description || "");
+      setDurationType(
+        (routine.duration_type as "week" | "month" | "trimester") || "week"
+      );
+      setStartDate(routine.start_date?.split("T")[0] || "");
+      setSelectedStudents(
+        assignments?.map((a) => a.student_id) || []
+      );
+
+      // Map workout_days to DayInput - handle both day_number and day_of_week
+      const workoutDays = routine.workout_days as (WorkoutDay & {
+        exercises: Exercise[];
+      })[];
+      const dayInputs: DayInput[] = workoutDays.map((wd) => ({
+        id: wd.id,
+        workoutDayId: wd.id,
+        day_number: (wd as WorkoutDay & { day_number?: number }).day_number ?? (wd as WorkoutDay & { day_of_week?: number }).day_of_week ?? 1,
+        week_number: wd.week_number,
+        name: wd.name || "",
+        exercises: (wd.exercises || [])
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((e) => {
+            const configs = (e.set_configurations ?? []).map((c, i) => ({
+                  id: `${e.id}-config-${i}`,
+                  sets: c.sets?.toString() ?? "",
+                  reps: c.reps ?? "",
+                  weight: c.weight ?? "",
+                }));
+            if (configs.length === 0) {
+              configs.push({ id: `${e.id}-config-0`, sets: "", reps: "", weight: "" });
+            }
+            return {
+              id: e.id,
+              name: e.name,
+              set_configurations: configs,
+              video_url: e.video_url ?? "",
+              notes: e.notes ?? "",
+            };
+          }),
+      }));
+
+      setDays(dayInputs);
+      setLoading(false);
+    }
+
+    loadRoutine();
+  }, [routineId, trainerId, router, supabase]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !startDate) {
@@ -234,44 +324,46 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
       return;
     }
 
-    setLoading(true);
+    setSaving(true);
 
     try {
-      // Create routine
-      const { data: routine, error: routineError } = await supabase
+      // Update routine
+      const { error: routineError } = await supabase
         .from("routines")
-        .insert({
-          trainer_id: trainerId,
+        .update({
           name,
           description: description || null,
           duration_type: durationType,
           start_date: startDate,
           end_date: calculateEndDate(),
         })
-        .select()
-        .single();
+        .eq("id", routineId);
 
       if (routineError) throw routineError;
 
-      // Create workout days and exercises
+      // Get existing workout day IDs to track deletions
+      const existingWorkoutDayIds = days
+        .filter((d) => d.workoutDayId)
+        .map((d) => d.workoutDayId!);
+
+      const { data: allWorkoutDays } = await supabase
+        .from("workout_days")
+        .select("id")
+        .eq("routine_id", routineId);
+
+      const toDeleteWorkoutDays = (allWorkoutDays || []).filter(
+        (wd) => !existingWorkoutDayIds.includes(wd.id)
+      );
+
+      for (const wd of toDeleteWorkoutDays) {
+        await supabase.from("workout_days").delete().eq("id", wd.id);
+      }
+
+      // Update or create workout days and exercises
       for (const day of days) {
-        if (day.exercises.length === 0) continue;
+        if (day.exercises.length === 0 && !day.workoutDayId) continue;
 
-        const { data: workoutDay, error: dayError } = await supabase
-          .from("workout_days")
-          .insert({
-            routine_id: routine.id,
-            day_number: day.day_number,
-            week_number: day.week_number,
-            name: day.name || null,
-          })
-          .select()
-          .single();
-
-        if (dayError) throw dayError;
-
-        // Create exercises
-        const exercisesToInsert = day.exercises
+        const exercisesToSync = day.exercises
           .filter((e) => e.name.trim())
           .map((e, index) => {
             const setConfigs = e.set_configurations
@@ -281,73 +373,169 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
                 reps: c.reps || null,
                 weight: c.weight || null,
               }));
-            const configs = setConfigs.length > 0 ? setConfigs : [{ sets: null, reps: null, weight: null }];
             return {
-              workout_day_id: workoutDay.id,
+              id: isUuid(e.id) ? e.id : null,
               name: e.name,
-              set_configurations: configs,
+              set_configurations: setConfigs.length > 0 ? setConfigs : [{ sets: null, reps: null, weight: null }],
               video_url: e.video_url || null,
               notes: e.notes || null,
               order_index: index,
             };
           });
 
-        if (exercisesToInsert.length > 0) {
-          const { error: exercisesError } = await supabase
-            .from("exercises")
-            .insert(exercisesToInsert);
+        if (day.workoutDayId) {
+          // Update existing workout day
+          await supabase
+            .from("workout_days")
+            .update({
+              day_number: day.day_number,
+              week_number: day.week_number,
+              name: day.name || null,
+            })
+            .eq("id", day.workoutDayId);
 
-          if (exercisesError) throw exercisesError;
+          // Get existing exercise IDs for this day
+          const { data: existingExercises } = await supabase
+            .from("exercises")
+            .select("id")
+            .eq("workout_day_id", day.workoutDayId);
+
+          const syncedIds = exercisesToSync
+            .filter((e) => e.id)
+            .map((e) => e.id!);
+          const toDelete = (existingExercises || []).filter(
+            (ex) => !syncedIds.includes(ex.id)
+          );
+
+          for (const ex of toDelete) {
+            await supabase.from("exercises").delete().eq("id", ex.id);
+          }
+
+          for (const ex of exercisesToSync) {
+            const payload = {
+              name: ex.name,
+              set_configurations: ex.set_configurations,
+              video_url: ex.video_url,
+              notes: ex.notes,
+              order_index: ex.order_index,
+            };
+            if (ex.id) {
+              await supabase
+                .from("exercises")
+                .update(payload)
+                .eq("id", ex.id);
+            } else {
+              await supabase.from("exercises").insert({
+                workout_day_id: day.workoutDayId,
+                ...payload,
+              });
+            }
+          }
+        } else {
+          // Create new workout day
+          if (exercisesToSync.length === 0) continue;
+
+          const { data: workoutDay, error: dayError } = await supabase
+            .from("workout_days")
+            .insert({
+              routine_id: routineId,
+              day_number: day.day_number,
+              week_number: day.week_number,
+              name: day.name || null,
+            })
+            .select()
+            .single();
+
+          if (dayError) throw dayError;
+
+          if (workoutDay && exercisesToSync.length > 0) {
+            const exercisesToInsert = exercisesToSync.map((e, index) => ({
+                workout_day_id: workoutDay.id,
+                name: e.name,
+                set_configurations: e.set_configurations,
+                video_url: e.video_url,
+                notes: e.notes,
+                order_index: index,
+            }));
+
+            const { error: exError } = await supabase
+              .from("exercises")
+              .insert(exercisesToInsert);
+
+            if (exError) throw exError;
+          }
         }
       }
 
-      // Assign to students
-      if (selectedStudents.length > 0) {
-        const assignments = selectedStudents.map((studentId) => ({
-          routine_id: routine.id,
-          student_id: studentId,
-        }));
+      // Sync routine assignments
+      const { data: currentAssignments } = await supabase
+        .from("routine_assignments")
+        .select("student_id")
+        .eq("routine_id", routineId);
 
-        const { error: assignmentError } = await supabase
-          .from("routine_assignments")
-          .insert(assignments);
+      const currentIds = new Set(
+        (currentAssignments || []).map((a) => a.student_id)
+      );
+      const selectedSet = new Set(selectedStudents);
 
-        if (assignmentError) throw assignmentError;
+      for (const studentId of selectedSet) {
+        if (!currentIds.has(studentId)) {
+          await supabase.from("routine_assignments").insert({
+            routine_id: routineId,
+            student_id: studentId,
+          });
+        }
       }
 
-      toast.success("Rutina creada exitosamente");
-      router.push(`/dashboard/routines/${routine.id}`);
+      for (const studentId of currentIds) {
+        if (!selectedSet.has(studentId)) {
+          await supabase
+            .from("routine_assignments")
+            .delete()
+            .eq("routine_id", routineId)
+            .eq("student_id", studentId);
+        }
+      }
+
+      toast.success("Rutina actualizada exitosamente");
+      router.push(`/dashboard/routines/${routineId}`);
     } catch (error) {
       console.error(error);
-      toast.error("Error al crear la rutina");
+      toast.error("Error al actualizar la rutina");
     }
 
-    setLoading(false);
+    setSaving(false);
   };
 
   const dayNames = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
   const currentDayData = getCurrentDayData();
   const totalWeeks = getTotalWeeks();
 
+  if (loading) {
+    return (
+      <div className="min-h-screen pb-24 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pb-24">
-      {/* Header */}
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border/50 px-4 py-3">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/routines">
+          <Link href={`/dashboard/routines/${routineId}`}>
             <Button variant="ghost" size="icon">
               <ChevronLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <h1 className="font-bold text-lg">Nueva rutina</h1>
+          <h1 className="font-bold text-lg">Editar rutina</h1>
         </div>
       </header>
 
       <form onSubmit={handleSubmit} className="p-4 space-y-6">
-        {/* Basic info */}
         <Card className="border-border/50">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Informacion basica</CardTitle>
+            <CardTitle className="text-base">Información básica</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -362,7 +550,7 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Descripcion (opcional)</Label>
+              <Label htmlFor="description">Descripción (opcional)</Label>
               <Textarea
                 id="description"
                 placeholder="Describe el objetivo de esta rutina..."
@@ -374,10 +562,12 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Duracion</Label>
+                <Label>Duración</Label>
                 <Select
                   value={durationType}
-                  onValueChange={(v) => setDurationType(v as "week" | "month" | "trimester")}
+                  onValueChange={(v) =>
+                    setDurationType(v as "week" | "month" | "trimester")
+                  }
                 >
                   <SelectTrigger className="bg-background/50">
                     <SelectValue />
@@ -404,33 +594,32 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
           </CardContent>
         </Card>
 
-        {/* Week/Day selector */}
         <Card className="border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Ejercicios</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Week selector */}
             {totalWeeks > 1 && (
               <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => (
-                  <button
-                    key={week}
-                    type="button"
-                    onClick={() => setCurrentWeek(week)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
-                      currentWeek === week
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted hover:bg-muted/80"
-                    }`}
-                  >
-                    Semana {week}
-                  </button>
-                ))}
+                {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(
+                  (week) => (
+                    <button
+                      key={week}
+                      type="button"
+                      onClick={() => setCurrentWeek(week)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
+                        currentWeek === week
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted hover:bg-muted/80"
+                      }`}
+                    >
+                      Semana {week}
+                    </button>
+                  )
+                )}
               </div>
             )}
 
-            {/* Day selector */}
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5, 6, 7].map((day, index) => {
                 const hasExercises = days.some(
@@ -452,23 +641,25 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
                         : "bg-muted"
                     }`}
                   >
-                    <span className="text-xs font-medium block">{dayNames[index]}</span>
+                    <span className="text-xs font-medium block">
+                      {dayNames[index]}
+                    </span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Day name */}
             {currentDayData && (
               <Input
-                placeholder="Nombre del dia (ej: Pecho y triceps)"
+                placeholder="Nombre del día (ej: Pecho y tríceps)"
                 value={currentDayData.name}
-                onChange={(e) => updateDayName(currentDayData.id, e.target.value)}
+                onChange={(e) =>
+                  updateDayName(currentDayData.id, e.target.value)
+                }
                 className="bg-background/50"
               />
             )}
 
-            {/* Exercises list */}
             <div className="space-y-3">
               {currentDayData?.exercises.map((exercise, index) => (
                 <div
@@ -483,7 +674,9 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
                     <Input
                       placeholder="Nombre del ejercicio"
                       value={exercise.name}
-                      onChange={(e) => updateExercise(exercise.id, "name", e.target.value)}
+                      onChange={(e) =>
+                        updateExercise(exercise.id, "name", e.target.value)
+                      }
                       className="flex-1 bg-background/50"
                     />
                     <Button
@@ -497,10 +690,7 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
                   </div>
                   <div className="space-y-2">
                     {exercise.set_configurations.map((config, configIndex) => (
-                      <div
-                        key={config.id}
-                        className="flex items-center gap-2"
-                      >
+                      <div key={config.id} className="flex items-center gap-2">
                         <div className="grid grid-cols-3 gap-2 flex-1">
                           <Input
                             placeholder="Series"
@@ -547,7 +737,9 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
                             type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={() => removeSetConfig(exercise.id, config.id)}
+                            onClick={() =>
+                              removeSetConfig(exercise.id, config.id)
+                            }
                             className="shrink-0 text-muted-foreground hover:text-destructive"
                           >
                             <Minus className="w-4 h-4" />
@@ -571,13 +763,17 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
                   <Input
                     placeholder="URL del video (opcional)"
                     value={exercise.video_url}
-                    onChange={(e) => updateExercise(exercise.id, "video_url", e.target.value)}
+                    onChange={(e) =>
+                      updateExercise(exercise.id, "video_url", e.target.value)
+                    }
                     className="bg-background/50"
                   />
                   <Textarea
                     placeholder="Notas (opcional)"
                     value={exercise.notes}
-                    onChange={(e) => updateExercise(exercise.id, "notes", e.target.value)}
+                    onChange={(e) =>
+                      updateExercise(exercise.id, "notes", e.target.value)
+                    }
                     rows={2}
                     className="bg-background/50"
                   />
@@ -597,7 +793,6 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
           </CardContent>
         </Card>
 
-        {/* Assign to students */}
         {students.length > 0 && (
           <Card className="border-border/50">
             <CardHeader className="pb-3">
@@ -623,15 +818,19 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
           </Card>
         )}
 
-        {/* Submit */}
-        <Button type="submit" className="w-full" size="lg" disabled={loading}>
-          {loading ? (
+        <Button
+          type="submit"
+          className="w-full"
+          size="lg"
+          disabled={saving}
+        >
+          {saving ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Creando rutina...
+              Guardando...
             </>
           ) : (
-            "Crear rutina"
+            "Guardar cambios"
           )}
         </Button>
       </form>

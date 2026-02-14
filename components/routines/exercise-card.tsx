@@ -6,16 +6,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Check, Play, MessageSquare, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Check, Play, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Trash2 } from "lucide-react";
 import type { Exercise, ExerciseCompletion } from "@/lib/types";
 import { toast } from "sonner";
+
+interface CommentData {
+  id: string;
+  content: string;
+  created_at: string;
+}
 
 interface ExerciseCardProps {
   exercise: Exercise;
   completion?: ExerciseCompletion;
   isStudent: boolean;
   studentId: string;
+  routineId: string;
   onCompletionChange: (exerciseId: string, completion: ExerciseCompletion | null) => void;
+  comments?: CommentData[];
+  onCommentSaved?: () => void;
 }
 
 export function ExerciseCard({
@@ -23,7 +32,10 @@ export function ExerciseCard({
   completion,
   isStudent,
   studentId,
+  routineId,
   onCompletionChange,
+  comments = [],
+  onCommentSaved,
 }: ExerciseCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -80,6 +92,7 @@ export function ExerciseCard({
       student_id: studentId,
       comment_type: "exercise",
       exercise_id: exercise.id,
+      routine_id: routineId,
       content: comment.trim(),
     });
 
@@ -89,8 +102,24 @@ export function ExerciseCard({
       toast.success("Comentario guardado");
       setComment("");
       setShowComment(false);
+      onCommentSaved?.();
     }
     setLoading(false);
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", commentId)
+      .eq("student_id", studentId);
+
+    if (error) {
+      toast.error("Error al eliminar comentario");
+    } else {
+      toast.success("Comentario eliminado");
+      onCommentSaved?.();
+    }
   };
 
   return (
@@ -240,6 +269,35 @@ export function ExerciseCard({
           </div>
         )}
       </CardContent>
+
+      {/* Previous comments - always visible */}
+      {comments.length > 0 && (
+        <div className="px-4 pb-3 space-y-2">
+          {comments.map((c) => (
+            <div key={c.id} className="bg-muted/50 rounded-xl p-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm flex-1">{c.content}</p>
+                {isStudent && (
+                  <button
+                    onClick={() => handleDeleteComment(c.id)}
+                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0 p-0.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {new Date(c.created_at).toLocaleDateString("es-AR", {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </Card>
   );
 }

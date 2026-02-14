@@ -24,7 +24,7 @@ Dockerfile - Build multi-etapa
   Cómo usarlo
 
   # Buildear y correr
-  docker compose up --build
+docker compose --env-file .env.local up --build (para que lea las env de .env.local proque por default va siempre a .env)
 
   # O sin compose
   docker build \

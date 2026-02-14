@@ -19,6 +19,8 @@ interface DayCommentModalProps {
   onOpenChange: (open: boolean) => void;
   workoutDayId: string;
   studentId: string;
+  routineId: string;
+  onCommentSaved?: () => void;
 }
 
 export function DayCommentModal({
@@ -26,6 +28,8 @@ export function DayCommentModal({
   onOpenChange,
   workoutDayId,
   studentId,
+  routineId,
+  onCommentSaved,
 }: DayCommentModalProps) {
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,6 +43,7 @@ export function DayCommentModal({
       student_id: studentId,
       comment_type: "day",
       workout_day_id: workoutDayId,
+      routine_id: routineId,
       content: comment.trim(),
     });
 
@@ -48,6 +53,7 @@ export function DayCommentModal({
       toast.success("Comentario de dia guardado");
       setComment("");
       onOpenChange(false);
+      onCommentSaved?.();
     }
     setLoading(false);
   };

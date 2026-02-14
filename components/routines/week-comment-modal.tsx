@@ -20,6 +20,7 @@ interface WeekCommentModalProps {
   routineId: string;
   weekNumber: number;
   studentId: string;
+  onCommentSaved?: () => void;
 }
 
 export function WeekCommentModal({
@@ -28,6 +29,7 @@ export function WeekCommentModal({
   routineId,
   weekNumber,
   studentId,
+  onCommentSaved,
 }: WeekCommentModalProps) {
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
@@ -51,6 +53,7 @@ export function WeekCommentModal({
       toast.success("Comentario de semana guardado");
       setComment("");
       onOpenChange(false);
+      onCommentSaved?.();
     }
     setLoading(false);
   };

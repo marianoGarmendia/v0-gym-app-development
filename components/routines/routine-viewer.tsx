@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Pencil,
   UserPlus,
+  Trash2,
 } from "lucide-react";
 import {
   Dialog,
@@ -162,7 +163,7 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
 
       if (data) {
         const completionsMap: Record<string, ExerciseCompletion> = {};
-        data.forEach((c) => {
+        data.forEach((c: any) => {
           completionsMap[c.exercise_id] = c;
         });
         setCompletions(completionsMap);
@@ -172,6 +173,96 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
 
     fetchCompletions();
   }, [profile.id, profile.role, routine.workout_days, supabase]);
+
+  // Fetch comments for current week
+  const fetchComments = useCallback(async () => {
+    if (profile.role !== "student") return;
+
+    const weekWorkoutDays = routine.workout_days.filter(
+      (wd) => wd.week_number === selectedWeek
+    );
+    const workoutDayIds = weekWorkoutDays.map((wd) => wd.id);
+    const exerciseIds = weekWorkoutDays.flatMap((wd) =>
+      wd.exercises.map((e) => e.id)
+    );
+
+    // Fetch week comments
+    const { data: weekData } = await supabase
+      .from("comments")
+      .select("id, content, created_at, comment_type")
+      .eq("comment_type", "week")
+      .eq("routine_id", routine.id)
+      .eq("week_number", selectedWeek)
+      .eq("student_id", profile.id)
+      .order("created_at", { ascending: true });
+
+    setWeekComments(weekData || []);
+
+    // Fetch day comments
+    if (workoutDayIds.length > 0) {
+      const { data: dayData } = await supabase
+        .from("comments")
+        .select("id, content, created_at, comment_type, workout_day_id")
+        .eq("comment_type", "day")
+        .eq("routine_id", routine.id)
+        .in("workout_day_id", workoutDayIds)
+        .eq("student_id", profile.id)
+        .order("created_at", { ascending: true });
+
+      const dayMap: Record<string, CommentData[]> = {};
+      (dayData || []).forEach((c: CommentData & { workout_day_id?: string }) => {
+        if (c.workout_day_id) {
+          if (!dayMap[c.workout_day_id]) dayMap[c.workout_day_id] = [];
+          dayMap[c.workout_day_id].push(c);
+        }
+      });
+      setDayComments(dayMap);
+    } else {
+      setDayComments({});
+    }
+
+    // Fetch exercise comments
+    if (exerciseIds.length > 0) {
+      const { data: exData } = await supabase
+        .from("comments")
+        .select("id, content, created_at, comment_type, exercise_id")
+        .eq("comment_type", "exercise")
+        .eq("routine_id", routine.id)
+        .in("exercise_id", exerciseIds)
+        .eq("student_id", profile.id)
+        .order("created_at", { ascending: true });
+
+      const exMap: Record<string, CommentData[]> = {};
+      (exData || []).forEach((c: CommentData & { exercise_id?: string }) => {
+        if (c.exercise_id) {
+          if (!exMap[c.exercise_id]) exMap[c.exercise_id] = [];
+          exMap[c.exercise_id].push(c);
+        }
+      });
+      setExerciseComments(exMap);
+    } else {
+      setExerciseComments({});
+    }
+  }, [profile.id, profile.role, routine.id, routine.workout_days, selectedWeek, supabase]);
+
+  useEffect(() => {
+    fetchComments();
+  }, [fetchComments]);
+
+  const handleDeleteComment = async (commentId: string) => {
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", commentId)
+      .eq("student_id", profile.id);
+
+    if (error) {
+      toast.error("Error al eliminar comentario");
+    } else {
+      toast.success("Comentario eliminado");
+      fetchComments();
+    }
+  };
 
   const handlePrevWeek = () => {
     if (selectedWeek > 1) {
@@ -279,8 +370,8 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
                   selectedDay === day
                     ? "bg-primary text-primary-foreground"
                     : hasWorkout
-                    ? "bg-card hover:bg-muted"
-                    : "bg-transparent text-muted-foreground"
+                      ? "bg-card hover:bg-muted"
+                      : "bg-transparent text-muted-foreground"
                 )}
               >
                 <span className="text-xs font-medium block">{dayNames[index]}</span>
@@ -371,10 +462,43 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
                   completion={completions[exercise.id]}
                   isStudent={profile.role === "student"}
                   studentId={profile.id}
+                  routineId={routine.id}
                   onCompletionChange={handleCompletionChange}
+                  comments={exerciseComments[exercise.id]}
+                  onCommentSaved={fetchComments}
                 />
               ))}
             </div>
+
+            {/* Day comments */}
+            {currentWorkoutDay && dayComments[currentWorkoutDay.id]?.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Comentarios del dia</p>
+                {dayComments[currentWorkoutDay.id].map((c) => (
+                  <div key={c.id} className="bg-muted/50 rounded-xl p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm flex-1">{c.content}</p>
+                      {profile.role === "student" && (
+                        <button
+                          onClick={() => handleDeleteComment(c.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors shrink-0 p-0.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(c.created_at).toLocaleDateString("es-AR", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Comments section */}
             {profile.role === "student" && (
@@ -395,6 +519,36 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Comentar semana
                 </Button>
+              </div>
+            )}
+
+            {/* Week comments */}
+            {weekComments.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Comentarios de la semana</p>
+                {weekComments.map((c) => (
+                  <div key={c.id} className="bg-muted/50 rounded-xl p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm flex-1">{c.content}</p>
+                      {profile.role === "student" && (
+                        <button
+                          onClick={() => handleDeleteComment(c.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors shrink-0 p-0.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(c.created_at).toLocaleDateString("es-AR", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                ))}
               </div>
             )}
           </>
@@ -441,12 +595,15 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
         routineId={routine.id}
         weekNumber={selectedWeek}
         studentId={profile.id}
+        onCommentSaved={fetchComments}
       />
       <DayCommentModal
         open={dayCommentOpen}
         onOpenChange={setDayCommentOpen}
         workoutDayId={currentWorkoutDay?.id || ""}
         studentId={profile.id}
+        routineId={routine.id}
+        onCommentSaved={fetchComments}
       />
     </div>
   );

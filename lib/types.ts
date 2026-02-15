@@ -9,6 +9,17 @@ export interface Profile {
   onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
+  // Student context fields
+  objective: string | null;
+  birth_date: string | null;
+  gender: "male" | "female" | "other" | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  experience_level: "beginner" | "intermediate" | "advanced" | null;
+  injuries: string | null;
+  medical_notes: string | null;
+  desired_frequency: number | null;
+  notes: string | null;
 }
 
 export interface Routine {
@@ -90,4 +101,29 @@ export interface TrainerStudent {
   created_at: string;
   trainer?: Profile;
   student?: Profile;
+}
+
+export interface TrainerNote {
+  id: string;
+  trainer_id: string;
+  student_id: string;
+  routine_id: string | null;
+  content: string;
+  created_at: string;
+  trainer?: Profile;
+  routine?: Routine;
+}
+
+export interface BodyMetric {
+  id: string;
+  student_id: string;
+  recorded_at: string;
+  weight_kg: number | null;
+  body_fat_pct: number | null;
+  chest_cm: number | null;
+  waist_cm: number | null;
+  hips_cm: number | null;
+  arm_cm: number | null;
+  thigh_cm: number | null;
+  notes: string | null;
 }

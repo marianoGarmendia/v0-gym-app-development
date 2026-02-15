@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   ChevronLeft,
   Eye,
@@ -59,6 +60,17 @@ interface StudentComment {
   exercise_name?: string;
 }
 
+interface ExerciseCompletionData {
+  id: string;
+  exercise_id: string;
+  completed_at: string;
+  actual_sets: number | null;
+  actual_reps: string | null;
+  actual_weight: string | null;
+  exercise_name: string;
+  routine_name: string;
+}
+
 interface StudentDetailProps {
   student: Profile;
   trainerRoutines: RoutineInfo[];
@@ -78,6 +90,9 @@ export function StudentDetail({
   const [assigning, setAssigning] = useState(false);
   const [comments, setComments] = useState<StudentComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(true);
+  const [completionsWithData, setCompletionsWithData] = useState<ExerciseCompletionData[]>([]);
+  // Map exercise_id -> completion data for showing in exercise comments
+  const [completionsByExercise, setCompletionsByExercise] = useState<Record<string, ExerciseCompletionData>>({});
 
   useEffect(() => {
     async function fetchComments() {
@@ -162,7 +177,44 @@ export function StudentDetail({
       setLoadingComments(false);
     }
 
+    async function fetchCompletions() {
+      const { data } = await supabase
+        .from("exercise_completions")
+        .select("*, exercise:exercises(name, workout_day:workout_days(routine:routines(name)))")
+        .eq("student_id", student.id)
+        .order("completed_at", { ascending: false });
+
+      if (data) {
+        const mapped: ExerciseCompletionData[] = [];
+        const byExercise: Record<string, ExerciseCompletionData> = {};
+
+        data.forEach((c: any) => {
+          const item: ExerciseCompletionData = {
+            id: c.id,
+            exercise_id: c.exercise_id,
+            completed_at: c.completed_at,
+            actual_sets: c.actual_sets,
+            actual_reps: c.actual_reps,
+            actual_weight: c.actual_weight,
+            exercise_name: c.exercise?.name || "Ejercicio",
+            routine_name: c.exercise?.workout_day?.routine?.name || "",
+          };
+
+          byExercise[c.exercise_id] = item;
+
+          // Only include in the "with data" list if they registered actual values
+          if (c.actual_sets || c.actual_reps || c.actual_weight) {
+            mapped.push(item);
+          }
+        });
+
+        setCompletionsWithData(mapped);
+        setCompletionsByExercise(byExercise);
+      }
+    }
+
     fetchComments();
+    fetchCompletions();
   }, [student.id, supabase]);
 
   const assignedRoutineIds = assignments.map((a) => a.routine_id);
@@ -415,40 +467,125 @@ export function StudentDetail({
             </Card>
           ) : (
             <div className="space-y-3">
-              {comments.map((comment) => (
-                <Card key={comment.id} className="border-border/50">
+              {comments.map((comment) => {
+                const exerciseCompletion =
+                  comment.comment_type === "exercise" && comment.exercise_id
+                    ? completionsByExercise[comment.exercise_id]
+                    : null;
+
+                return (
+                  <Card key={comment.id} className="border-border/50">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
+                          <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                              {getCommentTypeLabel(comment.comment_type)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(comment.created_at).toLocaleDateString("es", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {getCommentLabel(comment)}
+                          </p>
+                          {/* Show actual performance data for exercise comments */}
+                          {exerciseCompletion &&
+                            (exerciseCompletion.actual_sets ||
+                              exerciseCompletion.actual_reps ||
+                              exerciseCompletion.actual_weight) && (
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <Dumbbell className="w-3.5 h-3.5 text-primary" />
+                                <span className="text-xs text-primary font-medium">
+                                  Realizado:{" "}
+                                  {[
+                                    exerciseCompletion.actual_sets &&
+                                      `${exerciseCompletion.actual_sets} series`,
+                                    exerciseCompletion.actual_reps &&
+                                      `${exerciseCompletion.actual_reps} reps`,
+                                    exerciseCompletion.actual_weight &&
+                                      `${exerciseCompletion.actual_weight}`,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" x ")}
+                                </span>
+                              </div>
+                            )}
+                          <p className="text-sm">{comment.content}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Exercise Performance Log */}
+        {completionsWithData.length > 0 && (
+          <div>
+            <h2 className="text-lg font-semibold mb-4">
+              <Dumbbell className="w-5 h-5 inline-block mr-2" />
+              Registro de entrenamiento
+            </h2>
+            <div className="space-y-3">
+              {completionsWithData.map((comp) => (
+                <Card key={comp.id} className="border-border/50">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
-                        <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <Dumbbell className="w-4 h-4 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            {getCommentTypeLabel(comment.comment_type)}
-                          </span>
+                          <span className="font-medium text-sm">{comp.exercise_name}</span>
                           <span className="text-xs text-muted-foreground">
-                            {new Date(comment.created_at).toLocaleDateString("es", {
+                            {new Date(comp.completed_at).toLocaleDateString("es", {
                               day: "numeric",
                               month: "short",
-                              year: "numeric",
                               hour: "2-digit",
                               minute: "2-digit",
                             })}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mb-1">
-                          {getCommentLabel(comment)}
-                        </p>
-                        <p className="text-sm">{comment.content}</p>
+                        {comp.routine_name && (
+                          <p className="text-xs text-muted-foreground mb-1.5">{comp.routine_name}</p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          {comp.actual_sets && (
+                            <Badge variant="secondary" className="text-xs">
+                              {comp.actual_sets} series
+                            </Badge>
+                          )}
+                          {comp.actual_reps && (
+                            <Badge variant="secondary" className="text-xs">
+                              {comp.actual_reps} reps
+                            </Badge>
+                          )}
+                          {comp.actual_weight && (
+                            <Badge variant="secondary" className="text-xs">
+                              {comp.actual_weight}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Assign Routine Dialog */}

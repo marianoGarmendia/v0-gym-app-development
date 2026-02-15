@@ -4,10 +4,12 @@ import { RoutineViewer } from "@/components/routines/routine-viewer";
 
 interface RoutinePageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ week?: string; day?: string }>;
 }
 
-export default async function RoutinePage({ params }: RoutinePageProps) {
+export default async function RoutinePage({ params, searchParams }: RoutinePageProps) {
   const { id } = await params;
+  const { week, day } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -86,6 +88,8 @@ export default async function RoutinePage({ params }: RoutinePageProps) {
       profile={profile}
       trainerStudents={trainerStudents}
       assignedStudentIds={assignedStudentIds}
+      initialWeek={week ? parseInt(week) : undefined}
+      initialDay={day ? parseInt(day) : undefined}
     />
   );
 }

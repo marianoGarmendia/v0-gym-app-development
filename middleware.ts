@@ -41,4 +41,28 @@ Esto es una convención de Next.js: si existe un archivo llamado middleware.ts
   - NextResponse.next() → dejá pasar
   - NextResponse.redirect(url) → mandalo a otra URL
   - NextResponse.json(...) → respondé directamente sin llegar al page
+
+  Cualquier request HTTP que llegue a tu servidor Next.js pasa por el middleware:    
+                                                                                                
+  - Navegar a una página: /dashboard, /auth/sign-up, etc.                                       
+  - Fetch a una API: fetch("/api/auth/sign-up"), fetch("/api/admin/create-user"), etc.        
+  - Links: hacer click en un <Link href="/dashboard/routines">                                  
+  - Redirects: router.push("/dashboard")                                                        
+
+  Todo pasa por el middleware primero. Por eso el fetch("/api/auth/sign-up") te daba 307: el
+  middleware lo interceptaba, veía que no había sesión, y lo redirigía a /auth/login antes de
+  que llegue a tu endpoint.
+
+  objetivo + plazo
+
+nivel + frecuencia + tiempo por sesión
+
+lesiones/limitaciones
+
+- si combina con clases como crossfit, high, intense?
+
+peso/altura/edad
+
+
+
 */

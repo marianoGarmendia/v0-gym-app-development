@@ -16,6 +16,7 @@ import {
   FileText,
   ChevronRight,
   Coffee,
+  ClipboardList,
 } from "lucide-react";
 import type { Profile, RoutineAssignment, Routine, WorkoutDay } from "@/lib/types";
 import Link from "next/link";
@@ -410,13 +411,14 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
               </CardContent>
             </Card>
           </Link>
-          <Card className="border-border/50 opacity-60">
-            <CardContent className="p-4 text-center">
-              <TrendingUp className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm font-medium">Mi progreso</p>
-              <p className="text-xs text-muted-foreground">Pronto</p>
-            </CardContent>
-          </Card>
+          <Link href="/dashboard/profile">
+            <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 text-center">
+                <ClipboardList className="w-6 h-6 mx-auto mb-2 text-primary" />
+                <p className="text-sm font-medium">Evaluacion de perfil</p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
       </section>
     </div>

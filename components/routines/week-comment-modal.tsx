@@ -20,6 +20,7 @@ interface WeekCommentModalProps {
   routineId: string;
   weekNumber: number;
   studentId: string;
+  tenantId: string;
   onCommentSaved?: () => void;
 }
 
@@ -29,6 +30,7 @@ export function WeekCommentModal({
   routineId,
   weekNumber,
   studentId,
+  tenantId,
   onCommentSaved,
 }: WeekCommentModalProps) {
   const [comment, setComment] = useState("");
@@ -40,6 +42,7 @@ export function WeekCommentModal({
     setLoading(true);
 
     const { error } = await supabase.from("comments").insert({
+      tenant_id: tenantId,
       student_id: studentId,
       comment_type: "week",
       routine_id: routineId,

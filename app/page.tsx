@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, Users, Calendar, MessageSquare, ChevronRight } from "lucide-react";
+import { getTenantContext } from "@/lib/tenant/server";
 
 export default async function HomePage({
   searchParams,
@@ -10,11 +11,18 @@ export default async function HomePage({
   searchParams: Promise<{ code?: string }>;
 }) {
   const params = await searchParams;
-  
+
   // If there's a code in the URL, redirect to callback to handle it
   if (params.code) {
     redirect(`/auth/callback?code=${params.code}&type=recovery`);
   }
+
+  const { tenantName, tenantSlug } = await getTenantContext();
+
+  // Use tenant name if on subdomain, otherwise generic
+  const appName = tenantName || "G10 Flow";
+  const isTenant = !!tenantSlug;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -24,15 +32,17 @@ export default async function HomePage({
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
               <Dumbbell className="w-5 h-5 text-primary" />
             </div>
-            <span className="font-bold text-xl">G10 Flow</span>
+            <span className="font-bold text-xl">{appName}</span>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild>
               <Link href="/auth/login">Ingresar</Link>
             </Button>
-            <Button asChild>
-              <Link href="/auth/sign-up">Comenzar</Link>
-            </Button>
+            {!isTenant && (
+              <Button asChild>
+                <Link href="/auth/sign-up">Comenzar</Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -40,29 +50,49 @@ export default async function HomePage({
       {/* Hero */}
       <section className="pt-32 pb-20 px-4">
         <div className="container mx-auto text-center max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
-            <span>Nueva version disponible</span>
-            <ChevronRight className="w-4 h-4" />
-          </div>
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 text-balance">
-            Gestiona tus rutinas de{" "}
-            <span className="text-primary">entrenamiento</span>
-          </h1>
-          <p className="text-lg text-muted-foreground mb-8 text-pretty max-w-2xl mx-auto">
-            Conecta entrenadores y alumnos en una plataforma moderna. Crea, comparte y
-            realiza seguimiento de rutinas personalizadas con facilidad.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button size="lg" asChild className="w-full sm:w-auto">
-              <Link href="/auth/sign-up">
-                Empezar gratis
-                <ChevronRight className="w-4 h-4 ml-2" />
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild className="w-full sm:w-auto bg-transparent">
-              <Link href="/auth/login">Ya tengo cuenta</Link>
-            </Button>
-          </div>
+          {isTenant ? (
+            <>
+              <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 text-balance">
+                Bienvenido a{" "}
+                <span className="text-primary">{appName}</span>
+              </h1>
+              <p className="text-lg text-muted-foreground mb-8 text-pretty max-w-2xl mx-auto">
+                Accedé a tus rutinas de entrenamiento, seguí tu progreso y comunicate con tu entrenador.
+              </p>
+              <Button size="lg" asChild className="w-full sm:w-auto">
+                <Link href="/auth/login">
+                  Ingresar
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+                <span>Nueva version disponible</span>
+                <ChevronRight className="w-4 h-4" />
+              </div>
+              <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 text-balance">
+                Gestiona tus rutinas de{" "}
+                <span className="text-primary">entrenamiento</span>
+              </h1>
+              <p className="text-lg text-muted-foreground mb-8 text-pretty max-w-2xl mx-auto">
+                Conecta entrenadores y alumnos en una plataforma moderna. Crea, comparte y
+                realiza seguimiento de rutinas personalizadas con facilidad.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Button size="lg" asChild className="w-full sm:w-auto">
+                  <Link href="/auth/sign-up">
+                    Empezar gratis
+                    <ChevronRight className="w-4 h-4 ml-2" />
+                  </Link>
+                </Button>
+                <Button size="lg" variant="outline" asChild className="w-full sm:w-auto bg-transparent">
+                  <Link href="/auth/login">Ya tengo cuenta</Link>
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -70,7 +100,7 @@ export default async function HomePage({
       <section className="py-20 px-4 bg-card/30">
         <div className="container mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
-            Todo lo que necesitas para entrenar
+            {isTenant ? "Qué podés hacer" : "Todo lo que necesitas para entrenar"}
           </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <FeatureCard
@@ -97,29 +127,31 @@ export default async function HomePage({
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto text-center max-w-2xl">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">
-            Comienza tu transformacion hoy
-          </h2>
-          <p className="text-muted-foreground mb-8">
-            Unete a cientos de atletas y entrenadores que ya usan G10 Flow
-          </p>
-          <Button size="lg" asChild>
-            <Link href="/auth/sign-up">Crear cuenta gratis</Link>
-          </Button>
-        </div>
-      </section>
+      {/* CTA - only for generic landing */}
+      {!isTenant && (
+        <section className="py-20 px-4">
+          <div className="container mx-auto text-center max-w-2xl">
+            <h2 className="text-2xl md:text-3xl font-bold mb-4">
+              Comienza tu transformacion hoy
+            </h2>
+            <p className="text-muted-foreground mb-8">
+              Unete a cientos de atletas y entrenadores que ya usan G10 Flow
+            </p>
+            <Button size="lg" asChild>
+              <Link href="/auth/sign-up">Crear cuenta gratis</Link>
+            </Button>
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border/50">
         <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Dumbbell className="w-4 h-4 text-primary" />
-            <span>G10 Flow</span>
+            <span>{appName}</span>
           </div>
-          <p>2026 G10 Flow. Todos los derechos reservados.</p>
+          <p>2026 {appName}. Todos los derechos reservados.</p>
         </div>
       </footer>
     </div>

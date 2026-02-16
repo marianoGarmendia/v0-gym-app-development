@@ -1,13 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { extractTenantSlug } from "@/lib/tenant";
 
 // Public sign-up endpoint - only creates students
 // Uses service role to skip email confirmation
+// Resolves tenant from Host header subdomain
 
 export async function POST(request: Request) {
   try {
     const { email, password, full_name } = await request.json();
-    console.log(email, password, full_name);
 
     if (!email || !password || !full_name) {
       return NextResponse.json(
@@ -34,6 +35,38 @@ export async function POST(request: Request) {
       }
     );
 
+    // Resolve tenant from Host header
+    const host = request.headers.get("host");
+    const tenantSlug = extractTenantSlug(host);
+
+    if (!tenantSlug) {
+      return NextResponse.json(
+        { error: "No se pudo determinar el gimnasio. Accede desde el subdominio correcto." },
+        { status: 400 }
+      );
+    }
+
+    // Validate tenant exists and is active
+    const { data: tenant, error: tenantError } = await supabaseAdmin
+      .from("tenants")
+      .select("id, name, is_active")
+      .eq("slug", tenantSlug)
+      .single();
+
+    if (tenantError || !tenant) {
+      return NextResponse.json(
+        { error: "Gimnasio no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    if (!tenant.is_active) {
+      return NextResponse.json(
+        { error: "Este gimnasio esta inactivo" },
+        { status: 403 }
+      );
+    }
+
     const { data: userData, error: createError } =
       await supabaseAdmin.auth.admin.createUser({
         email,
@@ -42,10 +75,10 @@ export async function POST(request: Request) {
         user_metadata: {
           full_name,
           role: "student", // Always student - cannot be overridden
+          tenant_id: tenant.id,
         },
       });
-console.log(userData);
-console.log(createError);
+
     if (createError) {
       return NextResponse.json(
         { error: createError.message },

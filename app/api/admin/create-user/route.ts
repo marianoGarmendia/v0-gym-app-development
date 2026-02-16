@@ -4,19 +4,20 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 
 // Admin API route to create users without email confirmation
 // Uses SUPABASE_SERVICE_ROLE_KEY for admin privileges
-// Auth: either adminSecret (scripts/external) or logged-in admin session (dashboard)
-
-const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY;
-console.log(ADMIN_SECRET_KEY);
+// Reads tenant_id from the admin's profile (no more adminSecret for tenant)
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { email, password, full_name, role, adminSecret } = body;
 
+    const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY;
+
     // Auth: adminSecret OR session with profile.role === 'admin'
     const hasValidSecret = adminSecret === ADMIN_SECRET_KEY;
     let isAdminSession = false;
+    let adminTenantId: string | null = null;
+
     if (!hasValidSecret) {
       const supabase = await createServerClient();
       const {
@@ -25,10 +26,11 @@ export async function POST(request: Request) {
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role")
+          .select("role, tenant_id")
           .eq("id", user.id)
           .single();
         isAdminSession = profile?.role === "admin";
+        adminTenantId = profile?.tenant_id || null;
       }
     }
 
@@ -36,7 +38,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "No autorizado. Usa la clave de administrador o inicia sesión como admin.",
+            "No autorizado. Usa la clave de administrador o inicia sesion como admin.",
         },
         { status: 401 },
       );
@@ -53,6 +55,15 @@ export async function POST(request: Request) {
     // Validate role
     if (!["admin", "trainer", "student"].includes(role)) {
       return NextResponse.json({ error: "Rol invalido" }, { status: 400 });
+    }
+
+    // Determine tenant_id: from admin session or from request body (for adminSecret)
+    const tenantId = adminTenantId || body.tenant_id;
+    if (!tenantId) {
+      return NextResponse.json(
+        { error: "No se pudo determinar el tenant_id" },
+        { status: 400 },
+      );
     }
 
     // Create Supabase admin client with service role key
@@ -76,6 +87,7 @@ export async function POST(request: Request) {
         user_metadata: {
           full_name,
           role,
+          tenant_id: tenantId,
         },
       });
 

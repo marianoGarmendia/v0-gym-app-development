@@ -1,8 +1,133 @@
-import { type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/proxy";
+import { type NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { extractTenantSlug } from "@/lib/tenant";
+
+const publicRoutes = [
+  "/",
+  "/auth/login",
+  "/auth/sign-up",
+  "/auth/error",
+  "/auth/sign-up-success",
+  "/auth/admin",
+  "/auth/callback",
+  "/auth/reset-password",
+  "/api/admin/create-user",
+  "/api/auth/sign-up",
+  "/api/manifest",
+  "/tenant-not-found",
+];
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request);
+  let supabaseResponse = NextResponse.next({ request });
+
+  // --- Supabase session refresh (existing logic from proxy.ts) ---
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // --- Super-admin routes: no tenant required ---
+  const pathname = request.nextUrl.pathname;
+  const isSuperAdminRoute = pathname.startsWith("/super-admin") || pathname.startsWith("/api/super-admin");
+
+  if (isSuperAdminRoute) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/auth/login";
+      return NextResponse.redirect(url);
+    }
+
+    // Verify superadmin role
+    const { data: saProfile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!saProfile || saProfile.role !== "superadmin") {
+      return new NextResponse("No autorizado. Se requiere rol superadmin.", {
+        status: 403,
+      });
+    }
+
+    return supabaseResponse;
+  }
+
+  // --- Tenant resolution ---
+  const host = request.headers.get("host");
+  const tenantSlug = extractTenantSlug(host);
+
+  if (tenantSlug) {
+    // Subdomain detected → resolve tenant from DB
+    const { data: tenant } = await supabase
+      .from("tenants")
+      .select("id, slug, name, is_active")
+      .eq("slug", tenantSlug)
+      .eq("is_active", true)
+      .single();
+
+    if (!tenant) {
+      // Tenant not found or inactive → rewrite to error page
+      const url = request.nextUrl.clone();
+      url.pathname = "/tenant-not-found";
+      return NextResponse.rewrite(url);
+    }
+
+    // If user is authenticated, validate they belong to this tenant
+    // Superadmins can access any tenant
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("tenant_id, role")
+        .eq("id", user.id)
+        .single();
+
+      if (profile && profile.role !== "superadmin" && profile.tenant_id !== tenant.id) {
+        // User belongs to a different tenant → 403
+        return new NextResponse("No tienes acceso a este gimnasio.", {
+          status: 403,
+        });
+      }
+    }
+
+    // Set tenant headers on response
+    supabaseResponse.headers.set("x-tenant-id", tenant.id);
+    supabaseResponse.headers.set("x-tenant-slug", tenant.slug);
+    supabaseResponse.headers.set("x-tenant-name", tenant.name);
+  }
+
+  // --- Auth protection (existing logic) ---
+  const isPublicRoute = publicRoutes.some(
+    (route) => request.nextUrl.pathname === route
+  );
+
+  if (!user && !isPublicRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/login";
+    return NextResponse.redirect(url);
+  }
+
+  return supabaseResponse;
 }
 
 export const config = {
@@ -10,59 +135,3 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
-
-/*
-Esto es una convención de Next.js: si existe un archivo llamado middleware.ts
-  en la raíz del proyecto, Next.js automáticamente ejecuta la función
-  middleware() exportada antes de cada request que matchee el patrón del matcher.
-
-  El matcher es un regex que dice "ejecutate en todas las rutas excepto archivos
-  estáticos (imágenes, CSS, JS del build)". Así que aplica a /dashboard,
-  /auth/admin, /api/admin/create-user, etc.
-
-  No necesitás registrarlo en ningún lado. Next.js lo detecta solo por el nombre
-  y ubicación del archivo.
-
-  Sin middleware, eso sigue funcionando. La diferencia es:
-  Con middleware: El request se frena antes de llegar al Server Component
-  Sin middleware: El Server Component se ejecuta, verifica, y después redirige
-  ────────────────────────────────────────
-  Con middleware: Los tokens se refrescan automáticamente en cada request
-  Sin middleware: Los tokens no se refrescan server-side → después de ~1 hora la
-    sesión muere
-  El middleware agrega dos cosas: protección más temprana y refresh de tokens.
-  Sin él, la app funciona pero la sesión no se renueva silenciosamente.
-
-  NextResponse.next()
-
-  Sí, exactamente. Es "dejá pasar este request al siguiente paso". Es como un
-  guardia que dice "todo bien, seguí adelante".
-
-  - NextResponse.next() → dejá pasar
-  - NextResponse.redirect(url) → mandalo a otra URL
-  - NextResponse.json(...) → respondé directamente sin llegar al page
-
-  Cualquier request HTTP que llegue a tu servidor Next.js pasa por el middleware:    
-                                                                                                
-  - Navegar a una página: /dashboard, /auth/sign-up, etc.                                       
-  - Fetch a una API: fetch("/api/auth/sign-up"), fetch("/api/admin/create-user"), etc.        
-  - Links: hacer click en un <Link href="/dashboard/routines">                                  
-  - Redirects: router.push("/dashboard")                                                        
-
-  Todo pasa por el middleware primero. Por eso el fetch("/api/auth/sign-up") te daba 307: el
-  middleware lo interceptaba, veía que no había sesión, y lo redirigía a /auth/login antes de
-  que llegue a tu endpoint.
-
-  objetivo + plazo
-
-nivel + frecuencia + tiempo por sesión
-
-lesiones/limitaciones
-
-- si combina con clases como crossfit, high, intense?
-
-peso/altura/edad
-
-
-
-*/

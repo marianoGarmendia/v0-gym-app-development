@@ -19,6 +19,7 @@ interface DayCommentModalProps {
   onOpenChange: (open: boolean) => void;
   workoutDayId: string;
   studentId: string;
+  tenantId: string;
   routineId: string;
   onCommentSaved?: () => void;
 }
@@ -28,6 +29,7 @@ export function DayCommentModal({
   onOpenChange,
   workoutDayId,
   studentId,
+  tenantId,
   routineId,
   onCommentSaved,
 }: DayCommentModalProps) {
@@ -40,6 +42,7 @@ export function DayCommentModal({
     setLoading(true);
 
     const { error } = await supabase.from("comments").insert({
+      tenant_id: tenantId,
       student_id: studentId,
       comment_type: "day",
       workout_day_id: workoutDayId,

@@ -20,5 +20,5 @@ export default async function StudentsPage() {
     redirect("/dashboard");
   }
 
-  return <StudentsManager trainerId={profile.id} />;
+  return <StudentsManager trainerId={profile.id} tenantId={profile.tenant_id} />;
 }

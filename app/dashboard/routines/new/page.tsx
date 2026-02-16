@@ -43,5 +43,5 @@ WHERE trainer_students.trainer_id = 'id-del-trainer';
   
   */
 
-  return <CreateRoutineForm trainerId={profile.id} students={students || []} />;
+  return <CreateRoutineForm trainerId={profile.id} tenantId={profile.tenant_id} students={students || []} />;
 }

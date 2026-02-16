@@ -135,7 +135,7 @@ export function ProfileEvaluation({ profile, bodyMetrics: initialMetrics }: Prof
 
   const handleSaveMetrics = async () => {
     setSavingMetrics(true);
-    const insertData: Record<string, any> = { student_id: profile.id };
+    const insertData: Record<string, any> = { tenant_id: profile.tenant_id, student_id: profile.id };
     if (metricsForm.weight_kg) insertData.weight_kg = parseFloat(metricsForm.weight_kg);
     if (metricsForm.body_fat_pct) insertData.body_fat_pct = parseFloat(metricsForm.body_fat_pct);
     if (metricsForm.chest_cm) insertData.chest_cm = parseFloat(metricsForm.chest_cm);

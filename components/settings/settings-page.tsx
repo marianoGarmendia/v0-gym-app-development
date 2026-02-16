@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { LogOut, User, Mail, Shield, Loader2 } from "lucide-react";
 import type { Profile } from "@/lib/types";
 import { toast } from "sonner";
+import { GymSettings } from "./gym-settings";
 
 interface SettingsPageProps {
   profile: Profile;
@@ -114,6 +115,9 @@ export function SettingsPage({ profile }: SettingsPageProps) {
           </form>
         </CardContent>
       </Card>
+
+      {/* Gym settings - admin only */}
+      {profile.role === "admin" && <GymSettings />}
 
       {/* Logout */}
       <Card className="border-border/50">

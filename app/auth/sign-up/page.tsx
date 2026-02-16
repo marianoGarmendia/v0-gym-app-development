@@ -1,9 +1,8 @@
 "use client";
 
 import React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loader2, Dumbbell } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 
 export default function SignUpPage() {
@@ -23,8 +23,33 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tenantName, setTenantName] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
+
+  // Try to get tenant name from the page's response headers (set by middleware)
+  // Since client components can't read response headers directly,
+  // we extract it from the subdomain on the client side
+  useEffect(() => {
+    const host = window.location.host;
+    const rootDomain = process.env.NEXT_PUBLIC_APP_ROOT_DOMAIN || "lvh.me:3000";
+    const suffix = `.${rootDomain}`;
+    if (host.endsWith(suffix)) {
+      const slug = host.slice(0, -suffix.length);
+      if (slug && !slug.includes(".")) {
+        // Fetch tenant name
+        supabase
+          .from("tenants")
+          .select("name")
+          .eq("slug", slug)
+          .eq("is_active", true)
+          .single()
+          .then(({ data }: { data: { name: string } | null }) => {
+            if (data) setTenantName(data.name);
+          });
+      }
+    }
+  }, [supabase]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +68,6 @@ export default function SignUpPage() {
       });
 
       const data = await res.json();
-      console.log(data);
 
       if (!res.ok) {
         toast.error(data.error || "Error al crear la cuenta");
@@ -79,6 +103,9 @@ export default function SignUpPage() {
             <Dumbbell className="w-8 h-8 text-primary" />
           </div>
           <div>
+            {tenantName && (
+              <p className="text-sm font-medium text-primary mb-1">{tenantName}</p>
+            )}
             <CardTitle className="text-2xl font-bold">Crear cuenta</CardTitle>
             <CardDescription className="text-muted-foreground">
               Registrate para comenzar a entrenar

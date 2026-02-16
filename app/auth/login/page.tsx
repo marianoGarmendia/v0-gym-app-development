@@ -50,7 +50,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     });
@@ -59,6 +59,21 @@ export default function LoginPage() {
       toast.error(error.message);
       setLoading(false);
       return;
+    }
+
+    // Redirect superadmin to super-admin panel
+    if (authData.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", authData.user.id)
+        .single();
+
+      if (profile?.role === "superadmin") {
+        router.push("/super-admin");
+        router.refresh();
+        return;
+      }
     }
 
     router.push("/dashboard");

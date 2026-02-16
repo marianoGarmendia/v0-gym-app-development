@@ -1,7 +1,25 @@
-export type UserRole = "admin" | "trainer" | "student";
+export type UserRole = "admin" | "trainer" | "student" | "superadmin";
+
+export interface Tenant {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  theme: Record<string, string> | null;
+  logo_url: string | null;
+  email: string | null;
+  phone: string | null;
+  is_active: boolean;
+  plan: string;
+  payment_status: string;
+  max_students: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface Profile {
   id: string;
+  tenant_id: string;
   email: string;
   full_name: string;
   avatar_url: string | null;
@@ -22,8 +40,25 @@ export interface Profile {
   notes: string | null;
 }
 
+export interface TrainerProfile {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  bio: string | null;
+  specialties: string[] | null;
+  experience_years: number | null;
+  certifications: string[] | null;
+  rating: number | null;
+  total_students: number;
+  availability: string | null;
+  social_links: Record<string, string> | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Routine {
   id: string;
+  tenant_id: string;
   trainer_id: string;
   name: string;
   description: string | null;
@@ -37,6 +72,7 @@ export interface Routine {
 
 export interface RoutineAssignment {
   id: string;
+  tenant_id: string;
   routine_id: string;
   student_id: string;
   assigned_at: string;
@@ -46,6 +82,7 @@ export interface RoutineAssignment {
 
 export interface WorkoutDay {
   id: string;
+  tenant_id: string;
   routine_id: string;
   day_number: number;
   week_number: number;
@@ -62,6 +99,7 @@ export interface SetConfiguration {
 
 export interface Exercise {
   id: string;
+  tenant_id: string;
   workout_day_id: string;
   name: string;
   set_configurations?: SetConfiguration[];
@@ -74,6 +112,7 @@ export interface Exercise {
 
 export interface ExerciseCompletion {
   id: string;
+  tenant_id: string;
   exercise_id: string;
   student_id: string;
   completed_at: string;
@@ -84,6 +123,7 @@ export interface ExerciseCompletion {
 
 export interface Comment {
   id: string;
+  tenant_id: string;
   student_id: string;
   comment_type: "exercise" | "day" | "week";
   exercise_id: string | null;
@@ -96,6 +136,7 @@ export interface Comment {
 
 export interface TrainerStudent {
   id: string;
+  tenant_id: string;
   trainer_id: string;
   student_id: string;
   created_at: string;
@@ -105,6 +146,7 @@ export interface TrainerStudent {
 
 export interface TrainerNote {
   id: string;
+  tenant_id: string;
   trainer_id: string;
   student_id: string;
   routine_id: string | null;
@@ -116,6 +158,7 @@ export interface TrainerNote {
 
 export interface BodyMetric {
   id: string;
+  tenant_id: string;
   student_id: string;
   recorded_at: string;
   weight_kg: number | null;

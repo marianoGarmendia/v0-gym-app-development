@@ -49,6 +49,7 @@ interface RoutineViewerProps {
 }
 
 export function RoutineViewer({ routine, profile, trainerStudents = [], assignedStudentIds = [], initialWeek, initialDay }: RoutineViewerProps) {
+  const tenantId = profile.tenant_id;
   const [selectedWeek, setSelectedWeek] = useState(initialWeek || 1);
   const [selectedDay, setSelectedDay] = useState(initialDay || 1);
   const [completions, setCompletions] = useState<Record<string, ExerciseCompletion>>({});
@@ -93,6 +94,7 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
       for (const studentId of newSet) {
         if (!currentSet.has(studentId)) {
           await supabase.from("routine_assignments").insert({
+            tenant_id: tenantId,
             routine_id: routine.id,
             student_id: studentId,
           });
@@ -487,6 +489,7 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
                   completion={completions[exercise.id]}
                   isStudent={profile.role === "student"}
                   studentId={profile.id}
+                  tenantId={tenantId}
                   routineId={routine.id}
                   onCompletionChange={handleCompletionChange}
                   comments={exerciseComments[exercise.id]}
@@ -620,6 +623,7 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
         routineId={routine.id}
         weekNumber={selectedWeek}
         studentId={profile.id}
+        tenantId={tenantId}
         onCommentSaved={fetchComments}
       />
       <DayCommentModal
@@ -627,6 +631,7 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
         onOpenChange={setDayCommentOpen}
         workoutDayId={currentWorkoutDay?.id || ""}
         studentId={profile.id}
+        tenantId={tenantId}
         routineId={routine.id}
         onCommentSaved={fetchComments}
       />

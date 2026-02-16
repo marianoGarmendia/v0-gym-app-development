@@ -29,6 +29,7 @@ interface ExerciseCardProps {
   completion?: ExerciseCompletion;
   isStudent: boolean;
   studentId: string;
+  tenantId: string;
   routineId: string;
   onCompletionChange: (exerciseId: string, completion: ExerciseCompletion | null) => void;
   comments?: CommentData[];
@@ -40,6 +41,7 @@ export function ExerciseCard({
   completion,
   isStudent,
   studentId,
+  tenantId,
   routineId,
   onCompletionChange,
   comments = [],
@@ -103,6 +105,7 @@ export function ExerciseCard({
     setCompletionDialogOpen(false);
 
     const insertData: Record<string, string | number | null> = {
+      tenant_id: tenantId,
       exercise_id: exercise.id,
       student_id: studentId,
     };
@@ -134,6 +137,7 @@ export function ExerciseCard({
     setLoading(true);
 
     const { error } = await supabase.from("comments").insert({
+      tenant_id: tenantId,
       student_id: studentId,
       comment_type: "exercise",
       exercise_id: exercise.id,

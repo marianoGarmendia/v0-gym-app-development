@@ -89,12 +89,14 @@ interface ExerciseCompletionData {
 
 interface StudentDetailProps {
   student: Profile;
+  tenantId: string;
   trainerRoutines: RoutineInfo[];
   initialAssignments: AssignmentWithRoutine[];
 }
 
 export function StudentDetail({
   student,
+  tenantId,
   trainerRoutines,
   initialAssignments,
 }: StudentDetailProps) {
@@ -293,6 +295,7 @@ export function StudentDetail({
     const { data, error } = await supabase
       .from("trainer_notes")
       .insert({
+        tenant_id: tenantId,
         trainer_id: (await supabase.auth.getUser()).data.user?.id,
         student_id: student.id,
         content: newNote.trim(),
@@ -325,6 +328,7 @@ export function StudentDetail({
     setSavingMetrics(true);
 
     const insertData: Record<string, any> = {
+      tenant_id: tenantId,
       student_id: student.id,
     };
     if (metricsForm.weight_kg) insertData.weight_kg = parseFloat(metricsForm.weight_kg);
@@ -446,6 +450,7 @@ export function StudentDetail({
     setAssigning(true);
 
     const insertData = selectedRoutines.map((routineId) => ({
+      tenant_id: tenantId,
       routine_id: routineId,
       student_id: student.id,
       visible: true,

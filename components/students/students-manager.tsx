@@ -21,13 +21,14 @@ import { toast } from "sonner";
 
 interface StudentsManagerProps {
   trainerId: string;
+  tenantId: string;
 }
 
 interface StudentWithProfile extends TrainerStudent {
   student: Profile;
 }
 
-export function StudentsManager({ trainerId }: StudentsManagerProps) {
+export function StudentsManager({ trainerId, tenantId }: StudentsManagerProps) {
   const [students, setStudents] = useState<StudentWithProfile[]>([]);
   const [allStudents, setAllStudents] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +69,7 @@ export function StudentsManager({ trainerId }: StudentsManagerProps) {
     setAddingStudent(studentId);
 
     const { error } = await supabase.from("trainer_students").insert({
+      tenant_id: tenantId,
       trainer_id: trainerId,
       student_id: studentId,
     });
@@ -85,6 +87,7 @@ export function StudentsManager({ trainerId }: StudentsManagerProps) {
           ...prev,
           {
             id: crypto.randomUUID(),
+            tenant_id: tenantId,
             trainer_id: trainerId,
             student_id: studentId,
             created_at: new Date().toISOString(),

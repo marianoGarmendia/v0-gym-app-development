@@ -29,6 +29,7 @@ interface StudentWithProfile extends TrainerStudent {
 interface EditRoutineFormProps {
   routineId: string;
   trainerId: string;
+  tenantId: string;
   students: StudentWithProfile[];
 }
 
@@ -64,6 +65,7 @@ function isUuid(str: string): boolean {
 export function EditRoutineForm({
   routineId,
   trainerId,
+  tenantId,
   students,
 }: EditRoutineFormProps) {
   const router = useRouter();
@@ -426,6 +428,7 @@ export function EditRoutineForm({
                 .eq("id", ex.id);
             } else {
               await supabase.from("exercises").insert({
+                tenant_id: tenantId,
                 workout_day_id: day.workoutDayId,
                 ...payload,
               });
@@ -438,6 +441,7 @@ export function EditRoutineForm({
           const { data: workoutDay, error: dayError } = await supabase
             .from("workout_days")
             .insert({
+              tenant_id: tenantId,
               routine_id: routineId,
               day_number: day.day_number,
               week_number: day.week_number,
@@ -450,6 +454,7 @@ export function EditRoutineForm({
 
           if (workoutDay && exercisesToSync.length > 0) {
             const exercisesToInsert = exercisesToSync.map((e, index) => ({
+                tenant_id: tenantId,
                 workout_day_id: workoutDay.id,
                 name: e.name,
                 set_configurations: e.set_configurations,
@@ -481,6 +486,7 @@ export function EditRoutineForm({
       for (const studentId of selectedSet) {
         if (!currentIds.has(studentId)) {
           await supabase.from("routine_assignments").insert({
+            tenant_id: tenantId,
             routine_id: routineId,
             student_id: studentId,
           });

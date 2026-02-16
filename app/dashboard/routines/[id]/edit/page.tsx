@@ -47,6 +47,7 @@ export default async function EditRoutinePage({ params }: EditRoutinePageProps) 
     <EditRoutineForm
       routineId={id}
       trainerId={profile.id}
+      tenantId={profile.tenant_id}
       students={students || []}
     />
   );

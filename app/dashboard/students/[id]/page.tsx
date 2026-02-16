@@ -72,6 +72,7 @@ export default async function StudentDetailPage({ params }: StudentDetailPagePro
   return (
     <StudentDetail
       student={student}
+      tenantId={profile.tenant_id}
       trainerRoutines={trainerRoutines || []}
       initialAssignments={(assignments || []) as any}
     />

@@ -35,6 +35,7 @@ interface StudentWithProfile extends TrainerStudent {
 
 interface CreateRoutineFormProps {
   trainerId: string;
+  tenantId: string;
   students: StudentWithProfile[];
 }
 
@@ -61,7 +62,7 @@ interface DayInput {
   exercises: ExerciseInput[];
 }
 
-export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProps) {
+export function CreateRoutineForm({ trainerId, tenantId, students }: CreateRoutineFormProps) {
   const router = useRouter();
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
@@ -309,6 +310,7 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
       const { data: routine, error: routineError } = await supabase
         .from("routines")
         .insert({
+          tenant_id: tenantId,
           trainer_id: trainerId,
           name,
           description: description || null,
@@ -328,6 +330,7 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
         const { data: workoutDay, error: dayError } = await supabase
           .from("workout_days")
           .insert({
+            tenant_id: tenantId,
             routine_id: routine.id,
             day_number: day.day_number,
             week_number: day.week_number,
@@ -351,6 +354,7 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
               }));
             const configs = setConfigs.length > 0 ? setConfigs : [{ sets: null, reps: null, weight: null }];
             return {
+              tenant_id: tenantId,
               workout_day_id: workoutDay.id,
               name: e.name,
               set_configurations: configs,
@@ -372,6 +376,7 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
       // Assign to students
       if (selectedStudents.length > 0) {
         const assignments = selectedStudents.map((studentId) => ({
+          tenant_id: tenantId,
           routine_id: routine.id,
           student_id: studentId,
         }));

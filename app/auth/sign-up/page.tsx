@@ -30,31 +30,45 @@ export default function SignUpPage() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        data: {
+    try {
+      // Create user via public sign-up endpoint (server-side, skips email confirmation)
+      const res = await fetch("/api/auth/sign-up", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
           full_name: fullName,
-          role: "student",
-        },
-      },
-    });
+        }),
+      });
 
-    if (error) {
-      if (error.message.includes("rate") || error.status === 429) {
-        toast.error(
-          "Demasiados intentos. Por favor espera unos minutos antes de intentar de nuevo."
-        );
-      } else {
-        toast.error(error.message);
+      const data = await res.json();
+      console.log(data);
+
+      if (!res.ok) {
+        toast.error(data.error || "Error al crear la cuenta");
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-      return;
+
+      // Auto-login after creation
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (loginError) {
+        toast.success("Cuenta creada. Inicia sesion con tus credenciales.");
+        router.push("/auth/login");
+      } else {
+        toast.success("Cuenta creada exitosamente!");
+        router.push("/dashboard");
+      }
+    } catch {
+      toast.error("Error al crear la cuenta");
     }
 
-    router.push("/auth/sign-up-success");
+    setLoading(false);
   };
 
   return (

@@ -6,7 +6,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Check, Play, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Check, Play, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Trash2, Dumbbell } from "lucide-react";
 import type { Exercise, ExerciseCompletion } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -41,16 +49,34 @@ export function ExerciseCard({
   const [loading, setLoading] = useState(false);
   const [comment, setComment] = useState("");
   const [showComment, setShowComment] = useState(false);
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
+  const [actualSets, setActualSets] = useState("");
+  const [actualReps, setActualReps] = useState("");
+  const [actualWeight, setActualWeight] = useState("");
   const supabase = createClient();
 
   const isCompleted = !!completion;
 
+  // Get prescribed values from set_configurations for reference
+  const prescribedSummary = exercise.set_configurations
+    ?.filter((c) => c.sets != null || c.reps || c.weight)
+    .map((c) =>
+      [
+        c.sets != null && `${c.sets} series`,
+        c.reps && `${c.reps} reps`,
+        c.weight && `${c.weight}`,
+      ]
+        .filter(Boolean)
+        .join(" x ")
+    )
+    .join(" | ");
+
   const handleToggleComplete = async () => {
     if (!isStudent) return;
-    setLoading(true);
 
     if (isCompleted) {
       // Remove completion
+      setLoading(true);
       const { error } = await supabase
         .from("exercise_completions")
         .delete()
@@ -62,23 +88,42 @@ export function ExerciseCard({
         onCompletionChange(exercise.id, null);
         toast.success("Ejercicio desmarcado");
       }
+      setLoading(false);
     } else {
-      // Add completion
-      const { data, error } = await supabase
-        .from("exercise_completions")
-        .insert({
-          exercise_id: exercise.id,
-          student_id: studentId,
-        })
-        .select()
-        .single();
+      // Open dialog to register actual data
+      setActualSets("");
+      setActualReps("");
+      setActualWeight("");
+      setCompletionDialogOpen(true);
+    }
+  };
 
-      if (error) {
-        toast.error("Error al completar ejercicio");
-      } else {
-        onCompletionChange(exercise.id, data);
-        toast.success("Ejercicio completado!");
-      }
+  const handleCompleteWithData = async (skipData: boolean) => {
+    setLoading(true);
+    setCompletionDialogOpen(false);
+
+    const insertData: Record<string, string | number | null> = {
+      exercise_id: exercise.id,
+      student_id: studentId,
+    };
+
+    if (!skipData) {
+      if (actualSets) insertData.actual_sets = parseInt(actualSets);
+      if (actualReps) insertData.actual_reps = actualReps;
+      if (actualWeight) insertData.actual_weight = actualWeight;
+    }
+
+    const { data, error } = await supabase
+      .from("exercise_completions")
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (error) {
+      toast.error("Error al completar ejercicio");
+    } else {
+      onCompletionChange(exercise.id, data);
+      toast.success("Ejercicio completado!");
     }
 
     setLoading(false);
@@ -183,6 +228,22 @@ export function ExerciseCard({
                     ))
                 ) : null}
               </div>
+              {/* Show actual data if completed with registration */}
+              {isCompleted && (completion.actual_sets || completion.actual_reps || completion.actual_weight) && (
+                <div className="flex items-center gap-1.5 mt-2">
+                  <Dumbbell className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-xs text-primary font-medium">
+                    Realizado:{" "}
+                    {[
+                      completion.actual_sets && `${completion.actual_sets} series`,
+                      completion.actual_reps && `${completion.actual_reps} reps`,
+                      completion.actual_weight && `${completion.actual_weight}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" x ")}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Expand button */}
@@ -269,6 +330,72 @@ export function ExerciseCard({
           </div>
         )}
       </CardContent>
+
+      {/* Completion registration dialog */}
+      <Dialog open={completionDialogOpen} onOpenChange={setCompletionDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Registrar entrenamiento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{exercise.name}</span>
+              {prescribedSummary && (
+                <>
+                  <br />
+                  <span className="text-xs">Prescrito: {prescribedSummary}</span>
+                </>
+              )}
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Series</Label>
+                <Input
+                  type="number"
+                  placeholder="Ej: 3"
+                  value={actualSets}
+                  onChange={(e) => setActualSets(e.target.value)}
+                  className="bg-background/50"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Reps</Label>
+                <Input
+                  placeholder="Ej: 10"
+                  value={actualReps}
+                  onChange={(e) => setActualReps(e.target.value)}
+                  className="bg-background/50"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Peso</Label>
+                <Input
+                  placeholder="Ej: 40kg"
+                  value={actualWeight}
+                  onChange={(e) => setActualWeight(e.target.value)}
+                  className="bg-background/50"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={() => handleCompleteWithData(false)}
+                disabled={loading}
+              >
+                Guardar y completar
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => handleCompleteWithData(true)}
+                disabled={loading}
+                className="text-muted-foreground"
+              >
+                Completar sin registrar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Previous comments - always visible */}
       {comments.length > 0 && (

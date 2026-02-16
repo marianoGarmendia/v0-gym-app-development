@@ -44,11 +44,13 @@ interface RoutineViewerProps {
   profile: Profile;
   trainerStudents?: TrainerStudent[];
   assignedStudentIds?: string[];
+  initialWeek?: number;
+  initialDay?: number;
 }
 
-export function RoutineViewer({ routine, profile, trainerStudents = [], assignedStudentIds = [] }: RoutineViewerProps) {
-  const [selectedWeek, setSelectedWeek] = useState(1);
-  const [selectedDay, setSelectedDay] = useState(1);
+export function RoutineViewer({ routine, profile, trainerStudents = [], assignedStudentIds = [], initialWeek, initialDay }: RoutineViewerProps) {
+  const [selectedWeek, setSelectedWeek] = useState(initialWeek || 1);
+  const [selectedDay, setSelectedDay] = useState(initialDay || 1);
   const [completions, setCompletions] = useState<Record<string, ExerciseCompletion>>({});
   const [loading, setLoading] = useState(true);
   const [weekCommentOpen, setWeekCommentOpen] = useState(false);
@@ -358,9 +360,22 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
         {/* Day tabs */}
         <div className="flex gap-1 overflow-x-auto scrollbar-hide -mx-1 px-1">
           {daysInWeek.map((day, index) => {
-            const hasWorkout = routine.workout_days.some(
+            const workoutDay = routine.workout_days.find(
               (wd) => wd.week_number === selectedWeek && wd.day_number === day
             );
+            const hasWorkout = !!workoutDay;
+
+            // Calculate completion status for this day
+            let completionStatus: "none" | "partial" | "completed" = "none";
+            if (profile.role === "student" && workoutDay && workoutDay.exercises.length > 0) {
+              const dayCompletedCount = workoutDay.exercises.filter((e) => completions[e.id]).length;
+              if (dayCompletedCount === workoutDay.exercises.length) {
+                completionStatus = "completed";
+              } else if (dayCompletedCount > 0) {
+                completionStatus = "partial";
+              }
+            }
+
             return (
               <button
                 key={day}
@@ -376,6 +391,16 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
               >
                 <span className="text-xs font-medium block">{dayNames[index]}</span>
                 <span className="text-lg font-bold block">{day}</span>
+                {profile.role === "student" && hasWorkout && (
+                  <span
+                    className={cn(
+                      "block w-1.5 h-1.5 rounded-full mx-auto mt-1",
+                      completionStatus === "completed" && "bg-green-500",
+                      completionStatus === "partial" && "bg-yellow-500",
+                      completionStatus === "none" && "bg-transparent"
+                    )}
+                  />
+                )}
               </button>
             );
           })}

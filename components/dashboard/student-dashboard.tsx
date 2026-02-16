@@ -14,8 +14,11 @@ import {
   User,
   Clock,
   FileText,
+  ChevronRight,
+  Coffee,
+  ClipboardList,
 } from "lucide-react";
-import type { Profile, RoutineAssignment, Routine } from "@/lib/types";
+import type { Profile, RoutineAssignment, Routine, WorkoutDay } from "@/lib/types";
 import Link from "next/link";
 
 interface StudentDashboardProps {
@@ -26,10 +29,21 @@ interface AssignmentWithRoutine extends RoutineAssignment {
   routine: Routine & { trainer: Profile };
 }
 
+interface TodayWorkout {
+  routineId: string;
+  routineName: string;
+  dayName: string | null;
+  exerciseCount: number;
+  weekNumber: number;
+  dayNumber: number;
+}
+
 export function StudentDashboard({ profile }: StudentDashboardProps) {
   const [assignments, setAssignments] = useState<AssignmentWithRoutine[]>([]);
   const [trainers, setTrainers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [todayWorkout, setTodayWorkout] = useState<TodayWorkout | null>(null);
+  const [todayIsRest, setTodayIsRest] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -64,8 +78,62 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
           []
         );
         setTrainers(uniqueTrainers);
+
+        // Calculate today's workout
+        await calculateTodayWorkout(data as AssignmentWithRoutine[]);
       }
       setLoading(false);
+    }
+
+    async function calculateTodayWorkout(assignmentsData: AssignmentWithRoutine[]) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (const assignment of assignmentsData) {
+        const routine = assignment.routine;
+        const startDate = new Date(routine.start_date);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(routine.end_date);
+        endDate.setHours(23, 59, 59, 999);
+
+        // Check if today is within the routine date range
+        if (today < startDate || today > endDate) continue;
+
+        // Calculate days elapsed since start
+        const diffTime = today.getTime() - startDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        // Calculate week and day (1-indexed)
+        const weekNumber = Math.floor(diffDays / 7) + 1;
+        // Convert to day_number: Monday=1, Sunday=7
+        const jsDay = today.getDay(); // 0=Sun, 1=Mon, ...6=Sat
+        const dayNumber = jsDay === 0 ? 7 : jsDay;
+
+        // Fetch workout day for today
+        const { data: workoutDay } = await supabase
+          .from("workout_days")
+          .select("*, exercises(*)")
+          .eq("routine_id", routine.id)
+          .eq("week_number", weekNumber)
+          .eq("day_number", dayNumber)
+          .single();
+
+        if (workoutDay && workoutDay.exercises?.length > 0) {
+          setTodayWorkout({
+            routineId: routine.id,
+            routineName: routine.name,
+            dayName: workoutDay.name,
+            exerciseCount: workoutDay.exercises.length,
+            weekNumber,
+            dayNumber,
+          });
+          return;
+        }
+
+        // If we found a routine for today but no exercises, it's a rest day
+        setTodayIsRest(true);
+        return;
+      }
     }
 
     fetchData();
@@ -149,6 +217,59 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Today's Workout */}
+      {!loading && todayWorkout && (
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Tu entrenamiento de hoy</h2>
+          <Link
+            href={`/dashboard/routines/${todayWorkout.routineId}?week=${todayWorkout.weekNumber}&day=${todayWorkout.dayNumber}`}
+          >
+            <Card className="bg-gradient-to-br from-primary/15 to-primary/5 border-primary/30 hover:border-primary/50 transition-colors">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+                    <Dumbbell className="w-7 h-7 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {todayWorkout.dayName && (
+                      <h3 className="font-semibold truncate">{todayWorkout.dayName}</h3>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      {todayWorkout.routineName}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {todayWorkout.exerciseCount} ejercicios
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </section>
+      )}
+
+      {!loading && !todayWorkout && todayIsRest && (
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Tu entrenamiento de hoy</h2>
+          <Card className="border-border/50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                  <Coffee className="w-7 h-7 text-muted-foreground" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Dia de descanso</h3>
+                  <p className="text-sm text-muted-foreground">
+                    No hay ejercicios programados para hoy
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Trainers Section */}
       {trainers.length > 0 && (
@@ -290,13 +411,14 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
               </CardContent>
             </Card>
           </Link>
-          <Card className="border-border/50 opacity-60">
-            <CardContent className="p-4 text-center">
-              <TrendingUp className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm font-medium">Mi progreso</p>
-              <p className="text-xs text-muted-foreground">Pronto</p>
-            </CardContent>
-          </Card>
+          <Link href="/dashboard/profile">
+            <Card className="border-border/50 hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 text-center">
+                <ClipboardList className="w-6 h-6 mx-auto mb-2 text-primary" />
+                <p className="text-sm font-medium">Evaluacion de perfil</p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
       </section>
     </div>

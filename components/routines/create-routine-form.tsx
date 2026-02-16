@@ -18,7 +18,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, Plus, Trash2, Loader2, GripVertical, Minus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ChevronLeft, Plus, Trash2, Loader2, GripVertical, Minus, Copy } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import type { Profile, TrainerStudent } from "@/lib/types";
@@ -69,6 +75,8 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
 
   const [currentWeek, setCurrentWeek] = useState(1);
   const [currentDay, setCurrentDay] = useState(1);
+  const [copyWeekDialogOpen, setCopyWeekDialogOpen] = useState(false);
+  const [targetWeeks, setTargetWeeks] = useState<number[]>([]);
 
   const getTotalWeeks = () => {
     switch (durationType) {
@@ -224,6 +232,66 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
       prev.includes(studentId)
         ? prev.filter((id) => id !== studentId)
         : [...prev, studentId]
+    );
+  };
+
+  const handleCopyWeek = () => {
+    if (targetWeeks.length === 0) {
+      toast.error("Selecciona al menos una semana destino");
+      return;
+    }
+
+    const sourceDays = days.filter((d) => d.week_number === currentWeek);
+    if (sourceDays.length === 0) {
+      toast.error("La semana actual no tiene ejercicios para copiar");
+      setCopyWeekDialogOpen(false);
+      return;
+    }
+
+    setDays((prevDays) => {
+      // Remove existing days in target weeks
+      const filtered = prevDays.filter(
+        (d) => !targetWeeks.includes(d.week_number)
+      );
+
+      // Create copies for each target week
+      const copies: DayInput[] = [];
+      for (const targetWeek of targetWeeks) {
+        for (const sourceDay of sourceDays) {
+          copies.push({
+            id: crypto.randomUUID(),
+            day_number: sourceDay.day_number,
+            week_number: targetWeek,
+            name: sourceDay.name,
+            exercises: sourceDay.exercises.map((e) => ({
+              id: crypto.randomUUID(),
+              name: e.name,
+              set_configurations: e.set_configurations.map((c) => ({
+                id: crypto.randomUUID(),
+                sets: c.sets,
+                reps: c.reps,
+                weight: c.weight,
+              })),
+              video_url: e.video_url,
+              notes: e.notes,
+            })),
+          });
+        }
+      }
+
+      return [...filtered, ...copies];
+    });
+
+    toast.success(
+      `Semana ${currentWeek} copiada a semana${targetWeeks.length > 1 ? "s" : ""} ${targetWeeks.join(", ")}`
+    );
+    setCopyWeekDialogOpen(false);
+    setTargetWeeks([]);
+  };
+
+  const toggleTargetWeek = (week: number) => {
+    setTargetWeeks((prev) =>
+      prev.includes(week) ? prev.filter((w) => w !== week) : [...prev, week]
     );
   };
 
@@ -412,21 +480,36 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
           <CardContent className="space-y-4">
             {/* Week selector */}
             {totalWeeks > 1 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => (
-                  <button
-                    key={week}
-                    type="button"
-                    onClick={() => setCurrentWeek(week)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
-                      currentWeek === week
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted hover:bg-muted/80"
-                    }`}
-                  >
-                    Semana {week}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide flex-1">
+                  {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => (
+                    <button
+                      key={week}
+                      type="button"
+                      onClick={() => setCurrentWeek(week)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
+                        currentWeek === week
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted hover:bg-muted/80"
+                      }`}
+                    >
+                      Semana {week}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setTargetWeeks([]);
+                    setCopyWeekDialogOpen(true);
+                  }}
+                  className="shrink-0"
+                >
+                  <Copy className="w-4 h-4 mr-1" />
+                  Copiar
+                </Button>
               </div>
             )}
 
@@ -635,6 +718,71 @@ export function CreateRoutineForm({ trainerId, students }: CreateRoutineFormProp
           )}
         </Button>
       </form>
+
+      {/* Copy week dialog */}
+      <Dialog open={copyWeekDialogOpen} onOpenChange={setCopyWeekDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Copiar semana {currentWeek}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Selecciona las semanas a las que quieres copiar los ejercicios de la semana {currentWeek}.
+            </p>
+            <div className="space-y-2">
+              {Array.from({ length: totalWeeks }, (_, i) => i + 1)
+                .filter((w) => w !== currentWeek)
+                .map((week) => {
+                  const weekHasData = days.some(
+                    (d) => d.week_number === week && d.exercises.length > 0
+                  );
+                  return (
+                    <div key={week} className="flex items-center gap-3">
+                      <Checkbox
+                        id={`copy-week-${week}`}
+                        checked={targetWeeks.includes(week)}
+                        onCheckedChange={() => toggleTargetWeek(week)}
+                      />
+                      <label
+                        htmlFor={`copy-week-${week}`}
+                        className="text-sm font-medium cursor-pointer flex-1"
+                      >
+                        Semana {week}
+                        {weekHasData && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            (se reemplazara)
+                          </span>
+                        )}
+                      </label>
+                    </div>
+                  );
+                })}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const allOtherWeeks = Array.from({ length: totalWeeks }, (_, i) => i + 1).filter(
+                  (w) => w !== currentWeek
+                );
+                setTargetWeeks(allOtherWeeks);
+              }}
+              className="w-full"
+            >
+              Seleccionar todas
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCopyWeek}
+              disabled={targetWeeks.length === 0}
+              className="w-full"
+            >
+              Copiar a {targetWeeks.length} semana{targetWeeks.length !== 1 ? "s" : ""}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

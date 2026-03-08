@@ -155,6 +155,7 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "UTC",
   });
 
   return (
@@ -361,6 +362,7 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
                             ).toLocaleDateString("es", {
                               day: "numeric",
                               month: "short",
+                              timeZone: "UTC",
                             })}{" "}
                             -{" "}
                             {new Date(
@@ -368,6 +370,7 @@ export function StudentDashboard({ profile }: StudentDashboardProps) {
                             ).toLocaleDateString("es", {
                               day: "numeric",
                               month: "short",
+                              timeZone: "UTC",
                             })}
                           </span>
                         </div>

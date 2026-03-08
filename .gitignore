@@ -13,3 +13,9 @@ node_modules/
 .env*.local
 .DS_Store
 .env
+
+# External reference folders (not part of the project)
+g10-flow-tenant-pwa/
+
+# Windows Zone.Identifier metadata files
+*Zone.Identifier

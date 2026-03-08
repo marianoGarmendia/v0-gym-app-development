@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import { BottomNav } from "@/components/bottom-nav";
 import { ChatButton } from "@/components/chat-button";
 import { getTenantContext } from "@/lib/tenant/server";
+import { TenantThemeProvider } from "@/components/providers/tenant-theme-provider";
+import { InstallBanner } from "@/components/pwa/install-banner";
+import { OfflineIndicator } from "@/components/pwa/offline-indicator";
+import { UpdatePrompt } from "@/components/pwa/update-prompt";
 
 /*
 Layout siempre se ejecuta antes que Page?
@@ -60,18 +64,34 @@ export default async function DashboardLayout({
     redirect("/auth/login");
   }
 
-  const { tenantName } = await getTenantContext();
+  const { tenantId, tenantName } = await getTenantContext();
+
+  // Fetch tenant theme if we have a tenant
+  let tenantTheme: Record<string, string> | null = null;
+  if (tenantId) {
+    const { data: tenant } = await supabase
+      .from("tenants")
+      .select("theme")
+      .eq("id", tenantId)
+      .single();
+    tenantTheme = tenant?.theme || null;
+  }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {tenantName && (
-        <div className="bg-primary/5 border-b border-primary/10 px-4 py-1.5 text-center">
-          <span className="text-xs font-medium text-primary">{tenantName}</span>
-        </div>
-      )}
-      {children}
-      <BottomNav role={profile.role} />
-      <ChatButton profile={profile} />
-    </div>
+    <TenantThemeProvider theme={tenantTheme}>
+      <div className="min-h-screen bg-background pb-20">
+        <UpdatePrompt />
+        <OfflineIndicator />
+        {tenantName && (
+          <div className="bg-primary/5 border-b border-primary/10 px-4 py-1.5 text-center">
+            <span className="text-xs font-medium text-primary">{tenantName}</span>
+          </div>
+        )}
+        {children}
+        <BottomNav role={profile.role} />
+        <ChatButton profile={profile} />
+        <InstallBanner />
+      </div>
+    </TenantThemeProvider>
   );
 }

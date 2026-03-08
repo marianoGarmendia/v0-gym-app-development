@@ -32,11 +32,11 @@ export default async function SuperAdminLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top nav */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <header className=" border-b border-gray-200 sticky top-0 z-50 bg-card">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-6">
-              <Link href="/super-admin" className="font-bold text-lg text-gray-900">
+          <div className="flex items-center justify-between h-14 bg-card">
+            <div className="flex items-center gap-6 px-4">
+              <Link href="/super-admin" className="font-bold text-lg text-white">
                 Super Admin
               </Link>
               <nav className="hidden sm:flex items-center gap-1">

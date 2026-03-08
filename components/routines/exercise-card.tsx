@@ -17,6 +17,8 @@ import {
 import { Check, Play, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Trash2, Dumbbell } from "lucide-react";
 import type { Exercise, ExerciseCompletion } from "@/lib/types";
 import { toast } from "sonner";
+import { queueMutation } from "@/lib/pwa/mutation-queue";
+import { cacheCompletion, deleteCachedCompletion } from "@/lib/pwa/offline-db";
 
 interface CommentData {
   id: string;
@@ -79,6 +81,22 @@ export function ExerciseCard({
     if (isCompleted) {
       // Remove completion
       setLoading(true);
+
+      if (!navigator.onLine) {
+        // Offline: queue deletion and update optimistically
+        await queueMutation({
+          table: 'exercise_completions',
+          type: 'DELETE',
+          data: {},
+          filters: { id: completion.id },
+        });
+        await deleteCachedCompletion(exercise.id);
+        onCompletionChange(exercise.id, null);
+        toast.info("Guardado offline — se sincronizará al reconectar");
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase
         .from("exercise_completions")
         .delete()
@@ -114,6 +132,30 @@ export function ExerciseCard({
       if (actualSets) insertData.actual_sets = parseInt(actualSets);
       if (actualReps) insertData.actual_reps = actualReps;
       if (actualWeight) insertData.actual_weight = actualWeight;
+    }
+
+    if (!navigator.onLine) {
+      // Offline: queue mutation and update optimistically
+      await queueMutation({
+        table: 'exercise_completions',
+        type: 'INSERT',
+        data: insertData,
+      });
+      const optimisticCompletion: ExerciseCompletion = {
+        id: `offline-${Date.now()}`,
+        tenant_id: tenantId,
+        exercise_id: exercise.id,
+        student_id: studentId,
+        completed_at: new Date().toISOString(),
+        actual_sets: insertData.actual_sets as number | null,
+        actual_reps: insertData.actual_reps as string | null,
+        actual_weight: insertData.actual_weight as string | null,
+      };
+      await cacheCompletion(optimisticCompletion.id, exercise.id, optimisticCompletion);
+      onCompletionChange(exercise.id, optimisticCompletion);
+      toast.info("Guardado offline — se sincronizará al reconectar");
+      setLoading(false);
+      return;
     }
 
     const { data, error } = await supabase

@@ -20,7 +20,7 @@ export default async function HomePage({
   const { tenantName, tenantSlug } = await getTenantContext();
 
   // Use tenant name if on subdomain, otherwise generic
-  const appName = tenantName || "G10 Flow";
+  const appName = tenantName || "FitIA";
   const isTenant = !!tenantSlug;
 
   return (

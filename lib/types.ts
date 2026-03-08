@@ -156,6 +156,24 @@ export interface TrainerNote {
   routine?: Routine;
 }
 
+export interface TenantMembership {
+  id: string;
+  user_id: string;
+  tenant_id: string;
+  role: UserRole;
+  created_at: string;
+}
+
+export interface PushSubscriptionRecord {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  created_at: string;
+}
+
 export interface BodyMetric {
   id: string;
   tenant_id: string;

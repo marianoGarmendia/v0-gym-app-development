@@ -5,6 +5,7 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 // Admin API route to create users without email confirmation
 // Uses SUPABASE_SERVICE_ROLE_KEY for admin privileges
 // Reads tenant_id from the admin's profile (no more adminSecret for tenant)
+// Handles existing emails: creates membership instead of failing
 
 export async function POST(request: Request) {
   try {
@@ -78,20 +79,38 @@ export async function POST(request: Request) {
       },
     );
 
-    // Create user with admin API (no email confirmation needed)
+    // Try to create user with admin API (no email confirmation needed)
     const { data: userData, error: createError } =
       await supabaseAdmin.auth.admin.createUser({
         email,
         password,
-        email_confirm: true, // Skip email verification
+        email_confirm: true,
         user_metadata: {
           full_name,
           role,
           tenant_id: tenantId,
         },
+        app_metadata: {
+          active_tenant_id: tenantId,
+        },
       });
 
     if (createError) {
+      // Handle existing email: create membership instead
+      if (
+        createError.message.includes("already been registered") ||
+        createError.message.includes("already registered") ||
+        createError.message.includes("User already registered")
+      ) {
+        return await handleExistingUser(
+          supabaseAdmin,
+          email.trim().toLowerCase(),
+          tenantId,
+          role,
+          full_name
+        );
+      }
+
       return NextResponse.json({ error: createError.message }, { status: 400 });
     }
 
@@ -111,4 +130,72 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleExistingUser(
+  supabaseAdmin: any,
+  email: string,
+  tenantId: string,
+  role: string,
+  fullName: string
+) {
+  // Find user by email
+  const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+  const authUser = usersData?.users?.find((u) => u.email === email);
+
+  if (!authUser) {
+    return NextResponse.json(
+      { error: "Error al buscar el usuario existente" },
+      { status: 500 },
+    );
+  }
+
+  // Check if already has membership in this tenant
+  const { data: existingMembership } = await supabaseAdmin
+    .from("tenant_memberships")
+    .select("id")
+    .eq("user_id", authUser.id)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (existingMembership) {
+    return NextResponse.json(
+      { error: "Este usuario ya esta registrado en este gimnasio" },
+      { status: 400 },
+    );
+  }
+
+  // Create membership
+  const { error: membershipError } = await supabaseAdmin
+    .from("tenant_memberships")
+    .insert({
+      user_id: authUser.id,
+      tenant_id: tenantId,
+      role,
+    });
+
+  if (membershipError) {
+    console.error("Error creating membership:", membershipError);
+    return NextResponse.json(
+      { error: "Error al crear la membresia" },
+      { status: 500 },
+    );
+  }
+
+  // Set active_tenant_id
+  await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+    app_metadata: { active_tenant_id: tenantId },
+  });
+
+  return NextResponse.json({
+    success: true,
+    user: {
+      id: authUser.id,
+      email,
+      full_name: fullName,
+      role,
+    },
+    message: "Usuario existente agregado a este gimnasio",
+  });
 }

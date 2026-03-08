@@ -30,6 +30,7 @@ import { ExerciseCard } from "./exercise-card";
 import { WeekCommentModal } from "./week-comment-modal";
 import { DayCommentModal } from "./day-comment-modal";
 import { toast } from "sonner";
+import { cacheRoutine } from "@/lib/pwa/offline-db";
 
 interface TrainerStudent {
   student_id: string;
@@ -119,6 +120,11 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
     }
     setSavingAssignments(false);
   };
+
+  // Cache routine in IndexedDB for offline access
+  useEffect(() => {
+    cacheRoutine(routine.id, routine);
+  }, [routine]);
 
   // Calculate total weeks based on duration
   const getTotalWeeks = () => {

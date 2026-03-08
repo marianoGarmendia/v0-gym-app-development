@@ -36,8 +36,13 @@ export async function GET(request: Request) {
   const manifest = {
     name,
     short_name: shortName,
+    id: "/dashboard",
     start_url: "/dashboard",
+    scope: "/",
     display: "standalone",
+    orientation: "portrait",
+    description: `${name} - Gestión de rutinas de entrenamiento`,
+    categories: ["fitness", "health"],
     theme_color: themeColor,
     background_color: backgroundColor,
     icons: [
@@ -45,11 +50,13 @@ export async function GET(request: Request) {
         src: "/icon-192.png",
         sizes: "192x192",
         type: "image/png",
+        purpose: "any maskable",
       },
       {
         src: "/icon-512.png",
         sizes: "512x512",
         type: "image/png",
+        purpose: "any maskable",
       },
     ],
   };

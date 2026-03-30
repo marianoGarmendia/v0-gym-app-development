@@ -34,23 +34,26 @@ export async function POST(request: Request) {
         // Resolve tenant from Host header
         const host = request.headers.get("host");
         const tenantSlug = extractTenantSlug(host);
+        console.log("[create-user] user:", user.id, "host:", host, "slug:", tenantSlug);
 
         if (tenantSlug) {
           // Use admin client to bypass RLS on these internal lookups
-          const { data: tenant } = await supabaseAdmin
+          const { data: tenant, error: tenantErr } = await supabaseAdmin
             .from("tenants")
             .select("id")
             .eq("slug", tenantSlug)
             .eq("is_active", true)
             .single();
+          console.log("[create-user] tenant:", tenant, "tenantErr:", tenantErr);
 
           if (tenant) {
-            const { data: membership } = await supabaseAdmin
+            const { data: membership, error: membershipErr } = await supabaseAdmin
               .from("tenant_memberships")
               .select("role")
               .eq("user_id", user.id)
               .eq("tenant_id", tenant.id)
               .single();
+            console.log("[create-user] membership:", membership, "membershipErr:", membershipErr);
 
             if (membership?.role === "admin") {
               isAdminSession = true;

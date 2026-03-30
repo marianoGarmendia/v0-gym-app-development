@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY;
 
     // Auth: adminSecret OR session with profile.role === 'admin'
-    const hasValidSecret = adminSecret === ADMIN_SECRET_KEY;
+    const hasValidSecret = !!(ADMIN_SECRET_KEY && adminSecret && adminSecret === ADMIN_SECRET_KEY);
     let isAdminSession = false;
     let adminTenantId: string | null = null;
 

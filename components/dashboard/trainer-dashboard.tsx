@@ -60,7 +60,7 @@ export function TrainerDashboard({ profile }: TrainerDashboardProps) {
   }, []);
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-8">
       {/* Header */}
       <header className="pt-2 flex items-start justify-between">
         <div>

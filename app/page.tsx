@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, Users, Calendar, MessageSquare, ChevronRight } from "lucide-react";
 import { getTenantContext } from "@/lib/tenant/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function HomePage({
   searchParams,
@@ -18,6 +19,29 @@ export default async function HomePage({
   }
 
   const { tenantName, tenantSlug } = await getTenantContext();
+
+  // Check auth session
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // If user is logged in, redirect to the appropriate dashboard
+  if (user) {
+    if (tenantSlug) {
+      redirect("/dashboard");
+    } else {
+      // Root domain: check if superadmin
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      if (profile?.role === "superadmin") {
+        redirect("/super-admin");
+      } else {
+        redirect("/dashboard");
+      }
+    }
+  }
 
   // Use tenant name if on subdomain, otherwise generic
   const appName = tenantName || "FitIA";

@@ -89,7 +89,7 @@ export default async function DashboardLayout({
         )}
         {children}
         <BottomNav role={profile.role} />
-        <ChatButton profile={profile} />
+        {/* <ChatButton profile={profile} /> */}
         <InstallBanner />
       </div>
     </TenantThemeProvider>

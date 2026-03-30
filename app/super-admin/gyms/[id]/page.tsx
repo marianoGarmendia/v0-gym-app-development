@@ -244,10 +244,13 @@ export default function GymDetailPage() {
                 {users.slice(0, 5).map((u) => (
                   <div
                     key={u.id}
-                    className="flex items-center justify-between text-sm"
+                    className="flex items-center justify-between text-sm gap-2"
                   >
-                    <span className="truncate">{u.full_name}</span>
-                    <Badge variant="secondary" className="text-xs">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{u.full_name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                    </div>
+                    <Badge variant="secondary" className="text-xs shrink-0">
                       {u.role}
                     </Badge>
                   </div>

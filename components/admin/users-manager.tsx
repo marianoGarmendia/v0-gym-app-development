@@ -42,12 +42,13 @@ export function UsersManager() {
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     setUpdatingUser(userId);
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ role: newRole, updated_at: new Date().toISOString() })
-      .eq("id", userId);
+    const response = await fetch("/api/admin/update-user-role", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, newRole }),
+    });
 
-    if (error) {
+    if (!response.ok) {
       toast.error("Error al actualizar rol");
     } else {
       setUsers((prev) =>

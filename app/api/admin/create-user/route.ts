@@ -20,18 +20,24 @@ export async function POST(request: Request) {
     let isAdminSession = false;
     let adminTenantId: string | null = null;
 
+    // Create admin client early — used for RLS-free internal queries
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
     if (!hasValidSecret) {
       const supabase = await createServerClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         // Resolve tenant from Host header
         const host = request.headers.get("host");
         const tenantSlug = extractTenantSlug(host);
 
         if (tenantSlug) {
-          const { data: tenant } = await supabase
+          // Use admin client to bypass RLS on these internal lookups
+          const { data: tenant } = await supabaseAdmin
             .from("tenants")
             .select("id")
             .eq("slug", tenantSlug)
@@ -39,8 +45,7 @@ export async function POST(request: Request) {
             .single();
 
           if (tenant) {
-            // Verify user is admin in this tenant via tenant_memberships
-            const { data: membership } = await supabase
+            const { data: membership } = await supabaseAdmin
               .from("tenant_memberships")
               .select("role")
               .eq("user_id", user.id)
@@ -87,18 +92,6 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-
-    // Create Supabase admin client with service role key
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      },
-    );
 
     // Try to create user with admin API (no email confirmation needed)
     const { data: userData, error: createError } =

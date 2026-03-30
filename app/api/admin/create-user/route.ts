@@ -128,7 +128,7 @@ export async function POST(request: Request) {
           email.trim().toLowerCase(),
           tenantId,
           role,
-          full_name
+          full_name,
         );
       }
 
@@ -159,11 +159,11 @@ async function handleExistingUser(
   email: string,
   tenantId: string,
   role: string,
-  fullName: string
+  fullName: string,
 ) {
   // Find user by email
   const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
-  const authUser = usersData?.users?.find((u) => u.email === email);
+  const authUser = usersData?.users?.find((u: any) => u.email === email);
 
   if (!authUser) {
     return NextResponse.json(

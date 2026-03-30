@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { extractTenantSlug } from "@/lib/tenant";
 
 // Admin API route to create users without email confirmation
 // Uses SUPABASE_SERVICE_ROLE_KEY for admin privileges
@@ -25,13 +26,33 @@ export async function POST(request: Request) {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role, tenant_id")
-          .eq("id", user.id)
-          .single();
-        isAdminSession = profile?.role === "admin";
-        adminTenantId = profile?.tenant_id || null;
+        // Resolve tenant from Host header
+        const host = request.headers.get("host");
+        const tenantSlug = extractTenantSlug(host);
+
+        if (tenantSlug) {
+          const { data: tenant } = await supabase
+            .from("tenants")
+            .select("id")
+            .eq("slug", tenantSlug)
+            .eq("is_active", true)
+            .single();
+
+          if (tenant) {
+            // Verify user is admin in this tenant via tenant_memberships
+            const { data: membership } = await supabase
+              .from("tenant_memberships")
+              .select("role")
+              .eq("user_id", user.id)
+              .eq("tenant_id", tenant.id)
+              .single();
+
+            if (membership?.role === "admin") {
+              isAdminSession = true;
+              adminTenantId = tenant.id;
+            }
+          }
+        }
       }
     }
 

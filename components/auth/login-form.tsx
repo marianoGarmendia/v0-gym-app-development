@@ -74,7 +74,7 @@ export function LoginForm({ tenantName }: LoginFormProps) {
         return;
       }
 
-      // Set session from API response
+      // Set session cookies via the Supabase browser client
       if (data.session) {
         await supabase.auth.setSession({
           access_token: data.session.access_token,
@@ -82,29 +82,9 @@ export function LoginForm({ tenantName }: LoginFormProps) {
         });
       }
 
-      // Redirect superadmin to super-admin panel
-      if (data.user?.app_metadata?.role === "superadmin" || !tenantName) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", data.user.id)
-          .single();
-
-        if (profile?.role === "superadmin") {
-          if (tenantName) {
-            await supabase.auth.signOut();
-            toast.error("El superadmin solo puede ingresar desde el dominio principal");
-            setLoading(false);
-            return;
-          }
-          router.push("/super-admin");
-          router.refresh();
-          return;
-        }
-      }
-
-      router.push("/dashboard");
-      router.refresh();
+      // Hard redirect so the browser sends fresh cookies on the next request
+      const destination = data.role === "superadmin" ? "/super-admin" : "/dashboard";
+      window.location.href = destination;
     } catch {
       toast.error("Error al conectar con el servidor");
       setLoading(false);

@@ -104,9 +104,16 @@ export async function middleware(request: NextRequest) {
         .single();
 
       if (profile?.role !== "superadmin") {
-        // Check active_tenant_id from app_metadata
-        const activeTenantId = user.app_metadata?.active_tenant_id;
-        if (activeTenantId !== tenant.id) {
+        // Use tenant_memberships as source of truth (not app_metadata, which is
+        // user-global and breaks simultaneous sessions across multiple gyms)
+        const { data: membership } = await supabase
+          .from("tenant_memberships")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("tenant_id", tenant.id)
+          .single();
+
+        if (!membership) {
           return new NextResponse("No tienes acceso a este gimnasio.", {
             status: 403,
           });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,31 @@ import { DayCommentModal } from "./day-comment-modal";
 import { toast } from "sonner";
 import { cacheRoutine } from "@/lib/pwa/offline-db";
 
+/**
+ * Calculates which week and day of the routine corresponds to today,
+ * based on the routine's start_date.
+ * Returns { week, day } where day is 1=Mon ... 7=Sun.
+ */
+function getTodayPosition(startDate: string, totalWeeks: number): { week: number; day: number } {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const daysSinceStart = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Routine hasn't started yet → show week 1, day 1
+  if (daysSinceStart < 0) return { week: 1, day: 1 };
+
+  const week = Math.min(Math.floor(daysSinceStart / 7) + 1, totalWeeks);
+
+  // JS getDay(): 0=Sun, 1=Mon ... 6=Sat → convert to 1=Mon ... 7=Sun
+  const jsDay = today.getDay();
+  const day = jsDay === 0 ? 7 : jsDay;
+
+  return { week, day };
+}
+
 interface TrainerStudent {
   student_id: string;
   student: { id: string; full_name: string; email: string };
@@ -51,8 +76,25 @@ interface RoutineViewerProps {
 
 export function RoutineViewer({ routine, profile, trainerStudents = [], assignedStudentIds = [], initialWeek, initialDay }: RoutineViewerProps) {
   const tenantId = profile.tenant_id;
-  const [selectedWeek, setSelectedWeek] = useState(initialWeek || 1);
-  const [selectedDay, setSelectedDay] = useState(initialDay || 1);
+
+  // Calculate total weeks here so todayPosition can use it
+  const getTotalWeeks = () => {
+    switch (routine.duration_type) {
+      case "week": return 1;
+      case "month": return 4;
+      case "trimester": return 12;
+      default: return 1;
+    }
+  };
+  const totalWeeks = getTotalWeeks();
+
+  const todayPosition = useMemo(
+    () => getTodayPosition(routine.start_date, totalWeeks),
+    [routine.start_date, totalWeeks]
+  );
+
+  const [selectedWeek, setSelectedWeek] = useState(initialWeek ?? todayPosition.week);
+  const [selectedDay, setSelectedDay] = useState(initialDay ?? todayPosition.day);
   const [completions, setCompletions] = useState<Record<string, ExerciseCompletion>>({});
   const [loading, setLoading] = useState(true);
   const [weekCommentOpen, setWeekCommentOpen] = useState(false);
@@ -126,21 +168,6 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
     cacheRoutine(routine.id, routine);
   }, [routine]);
 
-  // Calculate total weeks based on duration
-  const getTotalWeeks = () => {
-    switch (routine.duration_type) {
-      case "week":
-        return 1;
-      case "month":
-        return 4;
-      case "trimester":
-        return 12;
-      default:
-        return 1;
-    }
-  };
-
-  const totalWeeks = getTotalWeeks();
   const daysInWeek = [1, 2, 3, 4, 5, 6, 7];
   const dayNames = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
 
@@ -351,8 +378,21 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <div className="text-center">
-              <span className="font-semibold">Semana {selectedWeek}</span>
-              <span className="text-muted-foreground text-sm"> / {totalWeeks}</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">Semana {selectedWeek}</span>
+                <span className="text-muted-foreground text-sm">/ {totalWeeks}</span>
+                {selectedWeek === todayPosition.week && (
+                  <span className="text-xs bg-primary/15 text-primary px-1.5 py-0.5 rounded-full font-medium">actual</span>
+                )}
+              </div>
+              {selectedWeek !== todayPosition.week && (
+                <button
+                  onClick={() => { setSelectedWeek(todayPosition.week); setSelectedDay(todayPosition.day); }}
+                  className="text-xs text-primary hover:underline mt-0.5"
+                >
+                  Ir a hoy
+                </button>
+              )}
             </div>
             <Button
               variant="ghost"
@@ -372,6 +412,7 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
               (wd) => wd.week_number === selectedWeek && wd.day_number === day
             );
             const hasWorkout = !!workoutDay;
+            const isToday = day === todayPosition.day && selectedWeek === todayPosition.week;
 
             // Calculate completion status for this day
             let completionStatus: "none" | "partial" | "completed" = "none";
@@ -389,7 +430,7 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
                 key={day}
                 onClick={() => setSelectedDay(day)}
                 className={cn(
-                  "flex-1 min-w-[44px] py-2 px-2 rounded-xl text-center transition-all",
+                  "flex-1 min-w-[44px] py-2 px-2 rounded-xl text-center transition-all relative",
                   selectedDay === day
                     ? "bg-primary text-primary-foreground"
                     : hasWorkout
@@ -397,7 +438,12 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
                       : "bg-transparent text-muted-foreground"
                 )}
               >
-                <span className="text-xs font-medium block">{dayNames[index]}</span>
+                <span className={cn(
+                  "text-xs font-medium block",
+                  isToday && selectedDay !== day && "text-primary font-bold"
+                )}>
+                  {isToday ? "HOY" : dayNames[index]}
+                </span>
                 <span className="text-lg font-bold block">{day}</span>
                 {profile.role === "student" && hasWorkout && (
                   <span
@@ -408,6 +454,9 @@ export function RoutineViewer({ routine, profile, trainerStudents = [], assigned
                       completionStatus === "none" && "bg-transparent"
                     )}
                   />
+                )}
+                {isToday && selectedDay !== day && (
+                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
                 )}
               </button>
             );

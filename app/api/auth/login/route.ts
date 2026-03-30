@@ -24,11 +24,10 @@ export async function POST(request: Request) {
       }
     );
 
-    // Resolve tenant from Host header
     const host = request.headers.get("host");
     const tenantSlug = extractTenantSlug(host);
 
-    // If no tenant slug (root domain), handle superadmin login directly
+    // Root domain → only superadmins allowed
     if (!tenantSlug) {
       const { data: signInData, error: signInError } =
         await supabaseAdmin.auth.signInWithPassword({
@@ -43,7 +42,6 @@ export async function POST(request: Request) {
         );
       }
 
-      // Check if superadmin
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("role")
@@ -60,10 +58,11 @@ export async function POST(request: Request) {
       return NextResponse.json({
         session: signInData.session,
         user: signInData.user,
+        role: "superadmin",
       });
     }
 
-    // Resolve tenant
+    // Tenant domain → resolve gym
     const { data: tenant } = await supabaseAdmin
       .from("tenants")
       .select("id, name, is_active")
@@ -105,34 +104,37 @@ export async function POST(request: Request) {
       );
     }
 
-    // Set active_tenant_id in app_metadata BEFORE signing in
+    // Update app_metadata so the JWT includes active_tenant_id (used by RLS via auth.jwt())
     await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
       app_metadata: { active_tenant_id: tenant.id },
     });
 
-    // Now sign in to validate password and generate session with updated JWT
+    // Update only the role in profile — do NOT update tenant_id because that
+    // field is global (one row per user) and updating it breaks concurrent
+    // sessions the user has in other gyms
+    await supabaseAdmin
+      .from("profiles")
+      .update({ role: membership.role })
+      .eq("id", authUser.id);
+
+    // Sign in to generate a fresh JWT that includes the updated app_metadata
     const { data: signInData, error: signInError } =
       await supabaseAdmin.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
       });
 
-    if (signInError) {
+    if (signInError || !signInData.session) {
       return NextResponse.json(
         { error: "Email o contrasena incorrectos" },
         { status: 401 }
       );
     }
 
-    // Update profile tenant_id to the active tenant for backward compat
-    await supabaseAdmin
-      .from("profiles")
-      .update({ tenant_id: tenant.id, role: membership.role })
-      .eq("id", authUser.id);
-
     return NextResponse.json({
       session: signInData.session,
       user: signInData.user,
+      role: membership.role,
     });
   } catch (error) {
     console.error("Error in login:", error);

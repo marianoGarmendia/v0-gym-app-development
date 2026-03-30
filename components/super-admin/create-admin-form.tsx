@@ -101,9 +101,11 @@ export function CreateAdminForm({ tenantId, onCreated }: CreateAdminFormProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Mínimo 6 caracteres"
-              required
               minLength={6}
             />
+            <p className="text-xs text-muted-foreground">
+              Si el usuario ya existe en la plataforma, dejá este campo vacío.
+            </p>
           </div>
           <div className="flex gap-3 justify-end">
             <Button

@@ -68,7 +68,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Try to create new user
+    // Check if user already exists before attempting to create
+    const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+    const existingAuthUser = usersData?.users?.find(
+      (u) => u.email === email.trim().toLowerCase()
+    );
+
+    if (existingAuthUser) {
+      return await handleExistingUser(
+        supabaseAdmin,
+        email.trim().toLowerCase(),
+        password,
+        tenant.id
+      );
+    }
+
+    // User doesn't exist — create them
     const { data: userData, error: createError } =
       await supabaseAdmin.auth.admin.createUser({
         email,
@@ -85,20 +100,6 @@ export async function POST(request: Request) {
       });
 
     if (createError) {
-      // Check if user already exists
-      if (
-        createError.message.includes("already been registered") ||
-        createError.message.includes("already registered") ||
-        createError.message.includes("User already registered")
-      ) {
-        return await handleExistingUser(
-          supabaseAdmin,
-          email.trim().toLowerCase(),
-          password,
-          tenant.id
-        );
-      }
-
       return NextResponse.json(
         { error: createError.message },
         { status: 400 }

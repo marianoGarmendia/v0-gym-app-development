@@ -50,6 +50,8 @@ interface RoutineInfo {
   name: string;
   description: string | null;
   duration_type: string;
+  trainer_id?: string;
+  trainer?: { full_name: string } | null;
 }
 
 interface AssignmentWithRoutine {
@@ -90,6 +92,7 @@ interface ExerciseCompletionData {
 interface StudentDetailProps {
   student: Profile;
   tenantId: string;
+  trainerId: string;
   trainerRoutines: RoutineInfo[];
   initialAssignments: AssignmentWithRoutine[];
 }
@@ -97,6 +100,7 @@ interface StudentDetailProps {
 export function StudentDetail({
   student,
   tenantId,
+  trainerId,
   trainerRoutines,
   initialAssignments,
 }: StudentDetailProps) {
@@ -675,78 +679,110 @@ export function StudentDetail({
           )}
         </div>
 
-        {/* Assigned Routines Section */}
+        {/* Assigned Routines Section — own routines */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Rutinas asignadas</h2>
+            <h2 className="text-lg font-semibold">Mis rutinas asignadas</h2>
             <Button size="sm" onClick={() => setAssignDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-1" />
               Asignar
             </Button>
           </div>
 
-          {assignments.length === 0 ? (
+          {assignments.filter((a) => a.routine.trainer_id === trainerId).length === 0 ? (
             <Card className="border-dashed border-2 border-border/50">
               <CardContent className="p-8 text-center">
                 <Dumbbell className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
                 <p className="text-muted-foreground">
-                  No hay rutinas asignadas a este alumno
+                  No le asignaste rutinas a este alumno
                 </p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-3">
-              {assignments.map((assignment) => (
-                <Card
-                  key={assignment.id}
-                  className={`border-border/50 transition-opacity ${
-                    !assignment.visible ? "opacity-50" : ""
-                  }`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <Dumbbell className="w-5 h-5 text-primary" />
+              {assignments
+                .filter((a) => a.routine.trainer_id === trainerId)
+                .map((assignment) => (
+                  <Card
+                    key={assignment.id}
+                    className={`border-border/50 transition-opacity ${
+                      !assignment.visible ? "opacity-50" : ""
+                    }`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                          <Dumbbell className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <Link href={`/dashboard/routines/${assignment.routine_id}`}>
+                            <h3 className="font-semibold truncate hover:text-primary transition-colors">
+                              {assignment.routine.name}
+                            </h3>
+                          </Link>
+                          <p className="text-sm text-muted-foreground">
+                            {getDurationLabel(assignment.routine.duration_type)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleVisibility(assignment.id, assignment.visible)}
+                            title={assignment.visible ? "Ocultar al alumno" : "Mostrar al alumno"}
+                          >
+                            {assignment.visible ? (
+                              <Eye className="w-4 h-4" />
+                            ) : (
+                              <EyeOff className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleUnassign(assignment.id, assignment.routine.name)}
+                            title="Desasignar rutina"
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <Link href={`/dashboard/routines/${assignment.routine_id}`}>
-                          <h3 className="font-semibold truncate hover:text-primary transition-colors">
-                            {assignment.routine.name}
-                          </h3>
-                        </Link>
-                        <p className="text-sm text-muted-foreground">
-                          {getDurationLabel(assignment.routine.duration_type)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => toggleVisibility(assignment.id, assignment.visible)}
-                          title={assignment.visible ? "Ocultar al alumno" : "Mostrar al alumno"}
-                        >
-                          {assignment.visible ? (
-                            <Eye className="w-4 h-4" />
-                          ) : (
-                            <EyeOff className="w-4 h-4 text-muted-foreground" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleUnassign(assignment.id, assignment.routine.name)}
-                          title="Desasignar rutina"
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                ))}
             </div>
           )}
         </div>
+
+        {/* Other trainers' routines — read-only */}
+        {assignments.some((a) => a.routine.trainer_id !== trainerId) && (
+          <div>
+            <h2 className="text-lg font-semibold mb-4">Rutinas de otros entrenadores</h2>
+            <div className="space-y-3">
+              {assignments
+                .filter((a) => a.routine.trainer_id !== trainerId)
+                .map((assignment) => (
+                  <Card key={assignment.id} className="border-border/50 opacity-75">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                          <Dumbbell className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold truncate text-muted-foreground">
+                            {assignment.routine.name}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            {assignment.routine.trainer?.full_name ?? "Otro entrenador"}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+            </div>
+          </div>
+        )}
 
         {/* Trainer Notes Section */}
         <div>

@@ -55,7 +55,7 @@ export default async function StudentDetailPage({ params }: StudentDetailPagePro
     .eq("trainer_id", profile.id)
     .order("created_at", { ascending: false });
 
-  // Fetch student's routine assignments with routine details
+  // Fetch student's routine assignments with routine details (including trainer info)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: assignments } = await supabase
     .from("routine_assignments")
@@ -65,7 +65,7 @@ export default async function StudentDetailPage({ params }: StudentDetailPagePro
       student_id,
       assigned_at,
       visible,
-      routine:routines(id, name, description, duration_type)
+      routine:routines(id, name, description, duration_type, trainer_id, trainer:profiles!routines_trainer_id_fkey(full_name))
     `)
     .eq("student_id", id);
 
@@ -73,6 +73,7 @@ export default async function StudentDetailPage({ params }: StudentDetailPagePro
     <StudentDetail
       student={student}
       tenantId={profile.tenant_id}
+      trainerId={profile.id}
       trainerRoutines={trainerRoutines || []}
       initialAssignments={(assignments || []) as any}
     />

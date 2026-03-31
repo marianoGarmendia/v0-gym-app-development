@@ -13,6 +13,7 @@ node_modules/
 .env*.local
 .DS_Store
 .env
+*.tsbuildinfo
 
 # External reference folders (not part of the project)
 g10-flow-tenant-pwa/
